@@ -10,7 +10,8 @@ import {IKXRouter} from "../interfaces/IKXRouter.sol";
 import {Events} from "../events/Events.sol";
 import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
-contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
+/// @custom:oz-upgrades-from DiracHoneyPotV1
+contract DiracUp is Controller, ERC4626Upgradeable{
 
     // ============ State Variables ============
     
@@ -326,6 +327,9 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         DOLOMITE_MARGIN.setOperators(args);
     }
 
+    function setOperators() external nonReentrant onlyRole(OPERATOR_ROLE)  whenNotPaused {
+        _setOperators();
+    }
     /**
      * @notice Supply iBGT to Dolomite as collateral
      * @param _amount Amount of iBGT to supply

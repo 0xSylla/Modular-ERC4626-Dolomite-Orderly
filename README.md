@@ -1,6 +1,6 @@
 
 
-##  Dirac Kodiak Strategy Contract
+##  Dirac Noneypot Strategy Contract
 
 This repository contains the implementation of the **Dirac Kodiak Perps Strategy** —
 a smart contract designed to interact seamlessly with the **Kodiak Perps Protocol**, built on top of **Orderly** infrastructure.
