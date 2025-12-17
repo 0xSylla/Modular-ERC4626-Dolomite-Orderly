@@ -51,6 +51,17 @@ interface IDolomiteMargin {
         address operator;
         bool trusted;
     }
+
+    struct Wei {
+        bool sign;   // true = positive, false = negative
+        uint256 value; // absolute value
+    }  
+
+    function getAccountWei(
+        address account,
+        uint256 accountNumber,
+        uint256 marketId
+    ) external view returns (Wei memory);
     
     function setOperators(OperatorArg[] calldata args) external;
 
