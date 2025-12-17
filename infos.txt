@@ -1,2 +1,0 @@
-orderly  pu key  : ed25519:3GfktXGnZ9Uftx5w6oA8VfSsBWjZxwvhV3AqgD827yZD
-orderly pv key : ed25519:C7MhjXY2xtiqnnGXzvESDmpm9jCkYxtVxn2d9FxF7Z2A
