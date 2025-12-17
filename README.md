@@ -43,7 +43,7 @@ clean integration with the Kodiak and Orderly protocols.
     * Checks market conditions before opening or closing positions
     * Handles **emergency stop** and **risk control** scenarios
 
-* **DiracKodiakV1.sol**
+* **DiracUp.sol**
   The **main strategy contract**, orchestrating all interactions between the Dirac base contracts and the Kodiak Perps Protocol.
   Combines control, event emission, and data management into a unified on-chain strategy.
 
