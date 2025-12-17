@@ -1,6 +1,6 @@
 
 
-##  Dirac Hopneypot Strategy Contract
+##  Dirac Honeypot Strategy Contract
 
 This repository contains the implementation of the **Dirac Honeypot Perps Strategy** —
 a smart contract designed to interact seamlessly with the **Honeypot Perps Protocol**, built on top of **Orderly** infrastructure.
