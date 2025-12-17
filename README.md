@@ -1,9 +1,9 @@
 
 
-##  Dirac Noneypot Strategy Contract
+##  Dirac Hopneypot Strategy Contract
 
-This repository contains the implementation of the **Dirac Kodiak Perps Strategy** —
-a smart contract designed to interact seamlessly with the **Kodiak Perps Protocol**, built on top of **Orderly** infrastructure.
+This repository contains the implementation of the **Dirac Honeypot Perps Strategy** —
+a smart contract designed to interact seamlessly with the **Honeypot Perps Protocol**, built on top of **Orderly** infrastructure.
 
 ---
 
@@ -29,7 +29,7 @@ providing a unified schema for strategy state and protocol interactions.
 
 **Folder:** `interfaces/`
 Holds the **interface definitions** for interacting with external contracts, ensuring modularity and 
-clean integration with the Kodiak and Orderly protocols.
+clean integration with the Honeypot and Orderly protocols.
 
 ---
 
@@ -44,7 +44,7 @@ clean integration with the Kodiak and Orderly protocols.
     * Handles **emergency stop** and **risk control** scenarios
 
 * **DiracUp.sol**
-  The **main strategy contract**, orchestrating all interactions between the Dirac base contracts and the Kodiak Perps Protocol.
+  The **main strategy contract**, orchestrating all interactions between the Dirac base contracts and the Honeypot Perps Protocol.
   Combines control, event emission, and data management into a unified on-chain strategy.
 
 ---
@@ -57,6 +57,6 @@ clean integration with the Kodiak and Orderly protocols.
 | **Data**          | `Data.sol`                        | Defines structs, enums, and constants |
 | **Interfaces**    | `interfaces/`                     | Contract integration interfaces       |
 | **Controller**    | `src/contracts/Controller.sol`    | Risk & strategy control logic         |
-| **DiracKodiakV1** | `src/contracts/DiracKodiakV1.sol` | Core strategy logic                   |
+| **DiracHoneypotV1** | `src/contracts/DiracHoneypotV1.sol` | Core strategy logic                   |
 
 ---
