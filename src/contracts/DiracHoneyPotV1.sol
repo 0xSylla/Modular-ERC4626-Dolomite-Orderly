@@ -481,7 +481,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
     /////////////////////////// VIEW FUNCTIONS /////////////////////////////////    
     ////////////////////////////////////////////////////////////////////////////
 
-    /
+    /**
      * @notice Get balances for BORROW_ACCOUNT 
      * @return collateralBalance iBGT collateral (positive) or debt (negative)
      * @return borrowBalance USDC balance (positive) or debt (negative)
@@ -514,7 +514,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             : -int256(borrowWei.value);
     }
     
-    /
+    /**
      * @notice Get balances for MAIN_ACCOUNT (account 0)
      * @return collateralBalance iBGT balance (positive) or debt (negative)
      * @return borrowBalance USDC balance (positive) or debt (negative)
