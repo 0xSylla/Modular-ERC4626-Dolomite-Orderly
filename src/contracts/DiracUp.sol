@@ -235,6 +235,14 @@ contract DiracUp is Controller, ERC4626Upgradeable{
             }
         }
     }
+
+    /**
+     * @notice Returns the total amount of assets held by the vault and deployed to Dolomite.
+     * @return The total assets.
+     */
+    function totalAssets() public view override returns (uint256) {
+        return super.totalAssets() + totalCollateralDeposited;
+    }
     ////////////////////////////////////////////////////////////////////////////
     //////////////////////////// SWAP FUNCTIONS ////////////////////////////////    
     ////////////////////////////////////////////////////////////////////////////
@@ -334,7 +342,7 @@ contract DiracUp is Controller, ERC4626Upgradeable{
      * @notice Supply iBGT to Dolomite as collateral
      * @param _amount Amount of iBGT to supply
      */
-    function supplyCollateralToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function supplyCollateralToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
         if (_amount == 0) revert ZeroAmount();
         
         uint256 contractBalance = collateralAsset.balanceOf(address(this));
@@ -361,7 +369,7 @@ contract DiracUp is Controller, ERC4626Upgradeable{
      * @notice Borrow USDC against iBGT collateral
      * @param _borrowAmount Amount of ETH to borrow (in wei, 18 decimals)
      */
-    function borrowAssetFromDolomite(uint256 _borrowAmount) external nonReentrant  onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function borrowAssetFromDolomite(uint256 _borrowAmount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
         if (_borrowAmount == 0) revert ZeroAmount();
         
         // Open borrow position and transfer collateral from vault account to borrow account
@@ -402,7 +410,7 @@ contract DiracUp is Controller, ERC4626Upgradeable{
      * @param _amount Amount to repay (0 = repay with 10% buffer for interest)
      * @dev After this, collateral will be back in account 0 (still in Dolomite)
      */
-    function repayDebtToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function repayDebtToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
         uint256 repayAmount = _amount;
 
         if (repayAmount == 0) {
@@ -454,7 +462,7 @@ contract DiracUp is Controller, ERC4626Upgradeable{
      * @param _amount Amount of iBGT to withdraw (0 = withdraw all)
      * @dev Requires all debt to be repaid first
      */
-    function withdrawCollateralFromDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function withdrawCollateralFromDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
         if (totalAssetBorrowed > 0) revert DebtExists();
         
         uint256 withdrawAmount = _amount;
