@@ -481,6 +481,72 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
     /////////////////////////// VIEW FUNCTIONS /////////////////////////////////    
     ////////////////////////////////////////////////////////////////////////////
 
+    /
+     * @notice Get balances for BORROW_ACCOUNT 
+     * @return collateralBalance iBGT collateral (positive) or debt (negative)
+     * @return borrowBalance USDC balance (positive) or debt (negative)
+     */
+    function getDebtAccountBalanceFromDolomite() public view returns (
+        int256 collateralBalance,
+        int256 borrowBalance
+    ) {
+        // Get iBGT collateral balance
+        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN.getAccountWei(
+            address(this),
+            BORROW_ACCOUNT,
+            DIBGT_MARKET_ID
+        );
+        
+        // Get USDC debt balance
+        IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
+            address(this),
+            BORROW_ACCOUNT,
+            USDC_MARKET_ID
+        );
+        
+        // Convert Wei to signed int256
+        collateralBalance = collateralWei.sign 
+            ? int256(collateralWei.value) 
+            : -int256(collateralWei.value);
+        
+        borrowBalance = borrowWei.sign 
+            ? int256(borrowWei.value) 
+            : -int256(borrowWei.value);
+    }
+    
+    /
+     * @notice Get balances for MAIN_ACCOUNT (account 0)
+     * @return collateralBalance iBGT balance (positive) or debt (negative)
+     * @return borrowBalance USDC balance (positive) or debt (negative)
+     */
+    function getMainAccountBalanceFromDolomite() public view returns (
+        int256 collateralBalance,
+        int256 borrowBalance
+    ) {
+        // Get iBGT balance
+        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN.getAccountWei(
+            address(this),
+            MAIN_ACCOUNT,
+            DIBGT_MARKET_ID
+        );
+        
+        // Get USDC balance
+        IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
+            address(this),
+            MAIN_ACCOUNT,
+            USDC_MARKET_ID
+        );
+        
+        // Convert Wei to signed int256
+        collateralBalance = collateralWei.sign 
+            ? int256(collateralWei.value) 
+            : -int256(collateralWei.value);
+        
+        borrowBalance = borrowWei.sign 
+            ? int256(borrowWei.value) 
+            : -int256(borrowWei.value);
+    }
+
     /**
      * @notice Dolomite position
      * @return collateral Total iBGT in Dolomite
