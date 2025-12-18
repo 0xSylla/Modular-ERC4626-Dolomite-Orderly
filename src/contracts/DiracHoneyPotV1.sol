@@ -239,9 +239,9 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @notice Returns the total amount of assets held by the vault and deployed to Dolomite.
      * @return The total assets.
      */
-    function totalAssets() public view override returns (uint256) {
-        return super.totalAssets() + totalCollateralDeposited;
-    }
+    //function totalAssets() public view override returns (uint256) {
+    //    return super.totalAssets() + totalCollateralDeposited;
+    //}
     ////////////////////////////////////////////////////////////////////////////
     //////////////////////////// SWAP FUNCTIONS ////////////////////////////////    
     ////////////////////////////////////////////////////////////////////////////
