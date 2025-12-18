@@ -17,5 +17,7 @@ berachain = { key = "${BERASCAN_API_KEY}", url = "https://api.berascan.com/api",
 bartio = { key = "${BERA_TRAIL_API_KEY}", url = "https://api.routescan.io/v2/network/testnet/evm/80084/etherscan", chain = 80084 }
 arbitrum = { key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api", chain = 42161 }
 arbitrum_sepolia = { key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api", chain = 421614 }
+[rpc_endpoints]
+mainnet = "https://rpc.berachain.com/"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
