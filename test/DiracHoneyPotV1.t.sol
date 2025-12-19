@@ -241,321 +241,321 @@ contract DiracHoneyPotV1Test is Test {
      * 4. Borrow USDC from Dolomite
      * 5. Deposit to Orderly
      */
-    // function test_FullLeverageStrategy() public {
-    //     console.log("Starting Full Leverage Strategy Test");
-    //     console.log("===========================================");
+    function test_FullLeverageStrategy() public {
+        console.log("Starting Full Leverage Strategy Test");
+        console.log("===========================================");
 
-    //     // ========== STEP 1: Users Deposit USDC ==========
-    //     uint256 userDepositAmount = 10000e6; // 10,000 USDC
+        // ========== STEP 1: Users Deposit USDC ==========
+        uint256 userDepositAmount = 10000e6; // 10,000 USDC
 
-    //     deal(USDC, user1, userDepositAmount);
-    //     vm.startPrank(user1);
-    //     IERC20(USDC).approve(address(vault), userDepositAmount);
-    //     vault.deposit(userDepositAmount, user1);
-    //     vm.stopPrank();
+        deal(USDC, user1, userDepositAmount);
+        vm.startPrank(user1);
+        IERC20(USDC).approve(address(vault), userDepositAmount);
+        vault.deposit(userDepositAmount, user1);
+        vm.stopPrank();
 
-    //     console.log("Step 1: User deposited", userDepositAmount / 1e6, "USDC");
-    //     assertEq(vault.totalAssets(), userDepositAmount);
+        console.log("Step 1: User deposited", userDepositAmount / 1e6, "USDC");
+        assertEq(vault.totalAssets(), userDepositAmount);
 
-    //     // ========== STEP 2: Start Trade Cycle ==========
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(7 days);
-    //     console.log("Step 2: Trade cycle started");
+        // ========== STEP 2: Start Trade Cycle ==========
+        vm.prank(admin);
+        vault.startTradeCycle(7 days);
+        console.log("Step 2: Trade cycle started");
 
-    //     vm.startPrank(operator);
+        vm.startPrank(operator);
 
-    //     // ========== STEP 3: Swap USDC → iBGT via Kodiak ==========
-    //     uint256 usdcToSwap = userDepositAmount; // Swap all deposited USDC
-    //     uint256 minIbgtOut = 9000 ether; // Expect ~9000 iBGT (assuming some slippage)
+        // ========== STEP 3: Swap USDC → iBGT via Kodiak ==========
+        uint256 usdcToSwap = userDepositAmount; // Swap all deposited USDC
+        uint256 minIbgtOut = 9000 ether; // Expect ~9000 iBGT (assuming some slippage)
 
-    //     // Mock swap data (in production, this would be real Kodiak path)
-    //     IKXRouter.SwapData memory swapData = IKXRouter.SwapData({
-    //         router: KODIAK_ROUTER,
-    //         data: ""
-    //     });
+        // Mock swap data (in production, this would be real Kodiak path)
+        IKXRouter.SwapData memory swapData = IKXRouter.SwapData({
+            router: KODIAK_ROUTER,
+            data: ""
+        });
 
-    //     IKXRouter.FeeData memory feeData = IKXRouter.FeeData({
-    //         feeQuote: 0,
-    //         surplusFeeBps: 0,
-    //         refCode: 0,
-    //         referrerFeeBps: 0
-    //     });
+        IKXRouter.FeeData memory feeData = IKXRouter.FeeData({
+            feeQuote: 0,
+            surplusFeeBps: 0,
+            refCode: 0,
+            referrerFeeBps: 0
+        });
 
-    //     // Mock the swap result by dealing iBGT
-    //     uint256 ibgtReceived = 9500 ether; // Simulated swap output
-    //     deal(iBGT, address(vault), ibgtReceived);
+        // Mock the swap result by dealing iBGT
+        uint256 ibgtReceived = 9500 ether; // Simulated swap output
+        deal(iBGT, address(vault), ibgtReceived);
 
-    //     console.log("Step 3: Swapped USDC to iBGT");
-    //     console.log("USDC amount:", usdcToSwap / 1e6);
-    //     console.log("iBGT received:", ibgtReceived / 1e18);
+        console.log("Step 3: Swapped USDC to iBGT");
+        console.log("USDC amount:", usdcToSwap / 1e6);
+        console.log("iBGT received:", ibgtReceived / 1e18);
 
-    //     // ========== STEP 4: Supply iBGT to Dolomite ==========
-    //     uint256 vaultIbgtBalance = IERC20(iBGT).balanceOf(address(vault));
+        // ========== STEP 4: Supply iBGT to Dolomite ==========
+        uint256 vaultIbgtBalance = IERC20(iBGT).balanceOf(address(vault));
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit CollateralSupplied(ibgtReceived);
+        vm.expectEmit(true, true, true, true);
+        emit CollateralSupplied(ibgtReceived);
 
-    //     vault.supplyCollateralToDolomite(ibgtReceived);
+        vault.supplyCollateralToDolomite(ibgtReceived);
 
-    //     console.log(
-    //         "Step 4: Supplied",
-    //         ibgtReceived / 1e18,
-    //         "iBGT to Dolomite"
-    //     );
-    //     assertEq(vault.totalCollateralDeposited(), ibgtReceived);
+        console.log(
+            "Step 4: Supplied",
+            ibgtReceived / 1e18,
+            "iBGT to Dolomite"
+        );
+        assertEq(vault.totalCollateralDeposited(), ibgtReceived);
 
-    //     // ========== STEP 5: Borrow USDC from Dolomite ==========
-    //     // Use minimal borrow amount to avoid exceeding Dolomite's max borrow limits
-    //     uint256 borrowAmount = 5 * 1e18; // 5 USDC in 18 decimals (Dolomite format)
+        // ========== STEP 5: Borrow USDC from Dolomite ==========
+        // Use minimal borrow amount to avoid exceeding Dolomite's max borrow limits
+        uint256 borrowAmount = 5 * 1e18; // 5 USDC in 18 decimals (Dolomite format)
 
-    //     uint256 vaultUsdcBefore = IERC20(USDC).balanceOf(address(vault));
+        uint256 vaultUsdcBefore = IERC20(USDC).balanceOf(address(vault));
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit AssetBorrowed(borrowAmount);
+        vm.expectEmit(true, true, true, true);
+        emit AssetBorrowed(borrowAmount);
 
-    //     vault.borrowAssetFromDolomite(borrowAmount);
+        vault.borrowAssetFromDolomite(borrowAmount);
 
-    //     console.log(
-    //         "Step 5: Borrowed",
-    //         borrowAmount / 1e18,
-    //         "USDC from Dolomite"
-    //     );
-    //     assertEq(vault.totalAssetBorrowed(), borrowAmount);
-    //     assertGt(IERC20(USDC).balanceOf(address(vault)), vaultUsdcBefore);
+        console.log(
+            "Step 5: Borrowed",
+            borrowAmount / 1e18,
+            "USDC from Dolomite"
+        );
+        assertEq(vault.totalAssetBorrowed(), borrowAmount);
+        assertGt(IERC20(USDC).balanceOf(address(vault)), vaultUsdcBefore);
 
-    //     // ========== STEP 6: Deposit to Orderly ==========
-    //     uint256 orderlyDepositAmount = borrowAmount / 1e12; // Convert to 6 decimals
+        // ========== STEP 6: Deposit to Orderly ==========
+        uint256 orderlyDepositAmount = borrowAmount / 1e12; // Convert to 6 decimals
 
-    //     VaultTypes.VaultDepositFE memory depositData = VaultTypes
-    //         .VaultDepositFE({
-    //             accountId: keccak256(abi.encodePacked(address(vault))),
-    //             brokerHash: keccak256("DIRAC"),
-    //             tokenHash: keccak256("USDC"),
-    //             tokenAmount: uint128(orderlyDepositAmount)
-    //         });
+        VaultTypes.VaultDepositFE memory depositData = VaultTypes
+            .VaultDepositFE({
+                accountId: keccak256(abi.encodePacked(address(vault))),
+                brokerHash: keccak256("DIRAC"),
+                tokenHash: keccak256("USDC"),
+                tokenAmount: uint128(orderlyDepositAmount)
+            });
 
-    //     // Mock orderly deposit (no actual transfer in mock)
-    //     // vault.depositToOrderly(depositData, 0);
+        // Mock orderly deposit (no actual transfer in mock)
+        // vault.depositToOrderly(depositData, 0);
 
-    //     console.log(
-    //         "Step 6: Would deposit",
-    //         orderlyDepositAmount / 1e6,
-    //         "USDC to Orderly"
-    //     );
+        console.log(
+            "Step 6: Would deposit",
+            orderlyDepositAmount / 1e6,
+            "USDC to Orderly"
+        );
 
-    //     // ========== Verify Final State ==========
-    //     console.log("Final Strategy State:");
-    //     console.log("===========================================");
+        // ========== Verify Final State ==========
+        console.log("Final Strategy State:");
+        console.log("===========================================");
 
-    //     uint256 leverageRatio = vault.getLeverageRatio();
-    //     console.log("Leverage Ratio:", leverageRatio / 1e16, "x"); // Convert to readable format
+        uint256 leverageRatio = vault.getLeverageRatio();
+        console.log("Leverage Ratio:", leverageRatio / 1e16, "x"); // Convert to readable format
 
-    //     (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
-    //     console.log("Collateral in Dolomite:", collateral / 1e18, "iBGT");
-    //     console.log("Debt in Dolomite:", borrowed / 1e18, "USDC");
+        (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
+        console.log("Collateral in Dolomite:", collateral / 1e18, "iBGT");
+        console.log("Debt in Dolomite:", borrowed / 1e18, "USDC");
 
-    //     (int256 collateralInBorrow, int256 debtInBorrow) = vault
-    //         .getDebtAccountBalanceFromDolomite();
-    //     console.log(
-    //         "Borrow Account Collateral:",
-    //         uint256(collateralInBorrow) / 1e18
-    //     );
-    //     console.log("Borrow Account Debt:", uint256(-debtInBorrow) / 1e18);
+        (int256 collateralInBorrow, int256 debtInBorrow) = vault
+            .getDebtAccountBalanceFromDolomite();
+        console.log(
+            "Borrow Account Collateral:",
+            uint256(collateralInBorrow) / 1e18
+        );
+        console.log("Borrow Account Debt:", uint256(-debtInBorrow) / 1e18);
 
-    //     // Assertions
-    //     assertGt(leverageRatio, 1e18, "Should be leveraged (>1x)");
-    //     assertEq(collateral, ibgtReceived, "Collateral mismatch");
-    //     assertEq(borrowed, borrowAmount, "Debt mismatch");
+        // Assertions
+        assertGt(leverageRatio, 1e18, "Should be leveraged (>1x)");
+        assertEq(collateral, ibgtReceived, "Collateral mismatch");
+        assertEq(borrowed, borrowAmount, "Debt mismatch");
 
-    //     console.log("===========================================");
-    //     console.log("Full Strategy Test Complete!");
+        console.log("===========================================");
+        console.log("Full Strategy Test Complete!");
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
     // ============================================
     // Unwind Position Test(Work in Progress)
     // ============================================
 
-    // function test_UnwindPosition() public {
-    //     console.log("Testing Position Unwind");
-    //     console.log("===========================================");
+    function test_UnwindPosition() public {
+        console.log("Testing Position Unwind");
+        console.log("===========================================");
 
-    //     // Setup: Create leveraged position first
-    //     uint256 userDeposit = 10000e6; // 10k USDC
-    //     deal(USDC, user1, userDeposit);
+        // Setup: Create leveraged position first
+        uint256 userDeposit = 10000e6; // 10k USDC
+        deal(USDC, user1, userDeposit);
 
-    //     vm.startPrank(user1);
-    //     IERC20(USDC).approve(address(vault), userDeposit);
-    //     vault.deposit(userDeposit, user1);
-    //     vm.stopPrank();
+        vm.startPrank(user1);
+        IERC20(USDC).approve(address(vault), userDeposit);
+        vault.deposit(userDeposit, user1);
+        vm.stopPrank();
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(7 days);
+        vm.prank(admin);
+        vault.startTradeCycle(7 days);
 
-    //     vm.startPrank(operator);
+        vm.startPrank(operator);
 
-    //     // Simulate strategy: swap, supply, borrow
-    //     uint256 ibgtAmount = 9500 ether;
-    //     deal(iBGT, address(vault), ibgtAmount);
-    //     vault.supplyCollateralToDolomite(ibgtAmount);
+        // Simulate strategy: swap, supply, borrow
+        uint256 ibgtAmount = 9500 ether;
+        deal(iBGT, address(vault), ibgtAmount);
+        vault.supplyCollateralToDolomite(ibgtAmount);
 
-    //     uint256 borrowAmount = 5 * 1e18; // 5 USDC - minimal amount to avoid LTV limits
-    //     vault.borrowAssetFromDolomite(borrowAmount);
+        uint256 borrowAmount = 5 * 1e18; // 5 USDC - minimal amount to avoid LTV limits
+        vault.borrowAssetFromDolomite(borrowAmount);
 
-    //     console.log("Position opened with", borrowAmount / 1e18, "USDC debt");
+        console.log("Position opened with", borrowAmount / 1e18, "USDC debt");
 
-    //     // ========== Unwind Process ==========
+        // ========== Unwind Process ==========
 
-    //     // Step 1: Ensure vault has USDC to repay (simulate profit or funding)
-    //     uint256 repayAmount = (borrowAmount * 110) / 100; // 10% buffer for interest
-    //     deal(USDC, address(vault), repayAmount / 1e12); // Convert to 6 decimals
+        // Step 1: Ensure vault has USDC to repay (simulate profit or funding)
+        uint256 repayAmount = (borrowAmount * 110) / 100; // 10% buffer for interest
+        deal(USDC, address(vault), repayAmount / 1e12); // Convert to 6 decimals
 
-    //     // Step 2: Repay debt
-    //     vault.repayDebtToDolomite(0); // 0 = auto-calculate with buffer
+        // Step 2: Repay debt
+        vault.repayDebtToDolomite(0); // 0 = auto-calculate with buffer
 
-    //     console.log("Debt repaid");
-    //     assertEq(vault.totalAssetBorrowed(), 0);
+        console.log("Debt repaid");
+        assertEq(vault.totalAssetBorrowed(), 0);
 
-    //     // Step 3: Withdraw collateral from Dolomite
-    //     vault.withdrawCollateralFromDolomite(0); // 0 = withdraw all
+        // Step 3: Withdraw collateral from Dolomite
+        vault.withdrawCollateralFromDolomite(0); // 0 = withdraw all
 
-    //     console.log("Collateral withdrawn");
-    //     assertEq(vault.totalCollateralDeposited(), 0);
-    //     assertEq(IERC20(iBGT).balanceOf(address(vault)), ibgtAmount);
+        console.log("Collateral withdrawn");
+        assertEq(vault.totalCollateralDeposited(), 0);
+        assertEq(IERC20(iBGT).balanceOf(address(vault)), ibgtAmount);
 
-    //     // Step 4: Swap iBGT back to USDC (simulate)
-    //     uint256 usdcReceived = 9000e6; // Simulate swap output
-    //     deal(USDC, address(vault), usdcReceived);
+        // Step 4: Swap iBGT back to USDC (simulate)
+        uint256 usdcReceived = 9000e6; // Simulate swap output
+        deal(USDC, address(vault), usdcReceived);
 
-    //     console.log("Swapped iBGT back to", usdcReceived / 1e6, "USDC");
+        console.log("Swapped iBGT back to", usdcReceived / 1e6, "USDC");
 
-    //     vm.stopPrank();
+        vm.stopPrank();
 
-    //     // Step 5: Close trade cycle
-    //     vm.prank(admin);
-    //     vault.requestToEndTradeCycle();
-    //     vault.endTradeCycle();
+        // Step 5: Close trade cycle
+        vm.prank(admin);
+        vault.requestToEndTradeCycle();
+        vault.endTradeCycle();
 
-    //     console.log("Trade cycle closed");
+        console.log("Trade cycle closed");
 
-    //     // Step 6: User can now withdraw
-    //     vm.startPrank(user1);
-    //     uint256 userShares = vault.balanceOf(user1);
-    //     vault.redeem(userShares, user1, user1);
+        // Step 6: User can now withdraw
+        vm.startPrank(user1);
+        uint256 userShares = vault.balanceOf(user1);
+        vault.redeem(userShares, user1, user1);
 
-    //     console.log("User withdrew all shares");
-    //     console.log("===========================================\n");
+        console.log("User withdrew all shares");
+        console.log("===========================================\n");
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
     // ============================================
     // Dolomite Integration Tests(Work in Progress)
     // ============================================
 
-    // function test_SupplyCollateralToDolomite() public {
-    //     uint256 ibgtAmount = 100 ether;
+    function test_SupplyCollateralToDolomite() public {
+        uint256 ibgtAmount = 100 ether;
 
-    //     // Get iBGT to vault
-    //     deal(iBGT, address(vault), ibgtAmount);
+        // Get iBGT to vault
+        deal(iBGT, address(vault), ibgtAmount);
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(1 days);
+        vm.prank(admin);
+        vault.startTradeCycle(1 days);
 
-    //     vm.startPrank(operator);
+        vm.startPrank(operator);
 
-    //     uint256 balanceBefore = IERC20(iBGT).balanceOf(address(vault));
+        uint256 balanceBefore = IERC20(iBGT).balanceOf(address(vault));
 
-    //     vault.supplyCollateralToDolomite(ibgtAmount);
+        vault.supplyCollateralToDolomite(ibgtAmount);
 
-    //     assertEq(vault.totalCollateralDeposited(), ibgtAmount);
-    //     assertEq(IERC20(iBGT).balanceOf(address(vault)), 0);
+        assertEq(vault.totalCollateralDeposited(), ibgtAmount);
+        assertEq(IERC20(iBGT).balanceOf(address(vault)), 0);
 
-    //     // Verify Dolomite account balance
-    //     (int256 collateral, ) = vault.getMainAccountBalanceFromDolomite();
-    //     assertGt(collateral, 0, "No collateral in Dolomite");
+        // Verify Dolomite account balance
+        (int256 collateral, ) = vault.getMainAccountBalanceFromDolomite();
+        assertGt(collateral, 0, "No collateral in Dolomite");
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
-    // function test_BorrowAssetFromDolomite() public {
-    //     uint256 collateralAmount = 100 ether; // 100 iBGT
-    //     uint256 borrowAmount = 1 * 1e18; // 1 USDC in 18 decimals - minimal to avoid LTV limits
+    function test_BorrowAssetFromDolomite() public {
+        uint256 collateralAmount = 100 ether; // 100 iBGT
+        uint256 borrowAmount = 1 * 1e18; // 1 USDC in 18 decimals - minimal to avoid LTV limits
 
-    //     deal(iBGT, address(vault), collateralAmount);
+        deal(iBGT, address(vault), collateralAmount);
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(1 days);
+        vm.prank(admin);
+        vault.startTradeCycle(1 days);
 
-    //     vm.startPrank(operator);
+        vm.startPrank(operator);
 
-    //     vault.supplyCollateralToDolomite(collateralAmount);
+        vault.supplyCollateralToDolomite(collateralAmount);
 
-    //     uint256 usdcBefore = IERC20(USDC).balanceOf(address(vault));
+        uint256 usdcBefore = IERC20(USDC).balanceOf(address(vault));
 
-    //     vault.borrowAssetFromDolomite(borrowAmount);
+        vault.borrowAssetFromDolomite(borrowAmount);
 
-    //     assertEq(vault.totalAssetBorrowed(), borrowAmount);
-    //     assertGt(IERC20(USDC).balanceOf(address(vault)), usdcBefore);
+        assertEq(vault.totalAssetBorrowed(), borrowAmount);
+        assertGt(IERC20(USDC).balanceOf(address(vault)), usdcBefore);
 
-    //     // Check borrow account has debt
-    //     (, int256 debt) = vault.getDebtAccountBalanceFromDolomite();
-    //     assertLt(debt, 0, "Should have debt in borrow account");
+        // Check borrow account has debt
+        (, int256 debt) = vault.getDebtAccountBalanceFromDolomite();
+        assertLt(debt, 0, "Should have debt in borrow account");
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
-    // function test_RepayDebtToDolomite() public {
-    //     uint256 collateralAmount = 100 ether;
-    //     uint256 borrowAmount = 1 * 1e18; // 1 USDC - minimal to avoid LTV limits
+    function test_RepayDebtToDolomite() public {
+        uint256 collateralAmount = 100 ether;
+        uint256 borrowAmount = 1 * 1e18; // 1 USDC - minimal to avoid LTV limits
 
-    //     // Setup position
-    //     deal(iBGT, address(vault), collateralAmount);
+        // Setup position
+        deal(iBGT, address(vault), collateralAmount);
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(1 days);
+        vm.prank(admin);
+        vault.startTradeCycle(1 days);
 
-    //     vm.startPrank(operator);
+        vm.startPrank(operator);
 
-    //     vault.supplyCollateralToDolomite(collateralAmount);
-    //     vault.borrowAssetFromDolomite(borrowAmount);
+        vault.supplyCollateralToDolomite(collateralAmount);
+        vault.borrowAssetFromDolomite(borrowAmount);
 
-    //     // Get USDC to repay
-    //     uint256 repayAmount = borrowAmount + (borrowAmount * 110) / 100;
-    //     deal(USDC, address(vault), repayAmount / 1e12); // 6 decimals
+        // Get USDC to repay
+        uint256 repayAmount = borrowAmount + (borrowAmount * 110) / 100;
+        deal(USDC, address(vault), repayAmount / 1e12); // 6 decimals
 
-    //     vault.repayDebtToDolomite(0);
+        vault.repayDebtToDolomite(0);
 
-    //     assertEq(vault.totalAssetBorrowed(), 0);
+        assertEq(vault.totalAssetBorrowed(), 0);
 
-    //     // Verify collateral returned to main account
-    //     (int256 collateralInMain, ) = vault.getMainAccountBalanceFromDolomite();
-    //     assertGt(collateralInMain, 0);
+        // Verify collateral returned to main account
+        (int256 collateralInMain, ) = vault.getMainAccountBalanceFromDolomite();
+        assertGt(collateralInMain, 0);
 
-    //     vm.stopPrank();
-    // }
+        vm.stopPrank();
+    }
 
-    // function test_GetLeverageRatio() public {
-    //     assertEq(vault.getLeverageRatio(), 1e18, "No leverage initially");
+    function test_GetLeverageRatio() public {
+        assertEq(vault.getLeverageRatio(), 1e18, "No leverage initially");
 
-    //     uint256 collateral = 10000 ether;
-    //     uint256 borrowed = 5 * 1e18; // 5 USDC - minimal to avoid LTV limits
+        uint256 collateral = 10000 ether;
+        uint256 borrowed = 5 * 1e18; // 5 USDC - minimal to avoid LTV limits
 
-    //     deal(iBGT, address(vault), collateral);
+        deal(iBGT, address(vault), collateral);
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(1 days);
+        vm.prank(admin);
+        vault.startTradeCycle(1 days);
 
-    //     vm.startPrank(operator);
-    //     vault.supplyCollateralToDolomite(collateral);
-    //     vault.borrowAssetFromDolomite(borrowed);
-    //     vm.stopPrank();
+        vm.startPrank(operator);
+        vault.supplyCollateralToDolomite(collateral);
+        vault.borrowAssetFromDolomite(borrowed);
+        vm.stopPrank();
 
-    //     // Leverage = (collateral + borrowed) / collateral
-    //     uint256 expected = ((collateral + borrowed) * 1e18) / collateral;
-    //     assertEq(vault.getLeverageRatio(), expected);
-    // }
+        // Leverage = (collateral + borrowed) / collateral
+        uint256 expected = ((collateral + borrowed) * 1e18) / collateral;
+        assertEq(vault.getLeverageRatio(), expected);
+    }
 
     // ============================================
     // Error Cases
@@ -612,22 +612,22 @@ contract DiracHoneyPotV1Test is Test {
         assertEq(usdcBal, 1000e6);
     }
     //(Work in Progress)
-    // function test_GetDolomitePosition() public {
-    //     deal(iBGT, address(vault), 1000 ether);
+    function test_GetDolomitePosition() public {
+        deal(iBGT, address(vault), 1000 ether);
 
-    //     vm.prank(admin);
-    //     vault.startTradeCycle(1 days);
+        vm.prank(admin);
+        vault.startTradeCycle(1 days);
 
-    //     vm.startPrank(operator);
-    //     vault.supplyCollateralToDolomite(1000 ether);
-    //     vault.borrowAssetFromDolomite(500 * 1e18);
-    //     vm.stopPrank();
+        vm.startPrank(operator);
+        vault.supplyCollateralToDolomite(1000 ether);
+        vault.borrowAssetFromDolomite(500 * 1e18);
+        vm.stopPrank();
 
-    //     (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
+        (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
 
-    //     assertEq(collateral, 1000 ether);
-    //     assertEq(borrowed, 500 * 1e18);
-    // }
+        assertEq(collateral, 1000 ether);
+        assertEq(borrowed, 500 * 1e18);
+    }
 
     // ============================================
     // Fuzz Tests

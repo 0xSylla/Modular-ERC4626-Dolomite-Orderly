@@ -25,26 +25,28 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
     /**
      * @notice Initializes the vault with the specified parameters.
-     * @param _ivault The address of the associated vault contract.
+     * @param _orderlyVault The address of the associated vault contract.
      * @param _assetDeposit The ERC20 token used for deposits.
+     * @param _collateralAsset The ERC20 token used for collateral.
+     * @param _borrowAsset The ERC20 token used for borrowing.
      */
 
     function initialize(
-        address _ivault,
+        address _orderlyVault,
         address _collateralAsset,
         address _borrowAsset,
         IERC20 _assetDeposit
     ) external initializer {
         if (
             address(_assetDeposit) == address(0) ||
-            address(_ivault) == address(0)
+            address(_orderlyVault) == address(0)
         ) {
             revert Events.ZeroAddress();
         }
 
         __ERC20_init("Dirac Honeypot Perpetual Vault", "DHPV");
         __ERC4626_init(_assetDeposit);
-        __Controller_init(_ivault, _assetDeposit);
+        __Controller_init(_orderlyVault, _assetDeposit);
 
         collateralAsset = IERC20(_collateralAsset);
         borrowAsset = IERC20(_borrowAsset);

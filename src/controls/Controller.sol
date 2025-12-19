@@ -28,7 +28,7 @@ contract Controller is
 
     // ============ Core State Variables ============
     IERC20 public assetDeposit;
-    address public ivault;
+    address public ivault; // Orderly vault
     mapping(address => bool) public whitelisted;
     uint256 public maxUserDeposit;
     mapping(address => uint256) public userDeposits;
@@ -50,9 +50,9 @@ contract Controller is
     uint256 public totalAssetBorrowed;
 
     // ============ Dolomite Constants ============
-    /// @notice Main vault account (0)
+    /// @notice Main vault account
     uint256 public constant MAIN_ACCOUNT = 0;
-    /// @notice Borrow account (123) - isolates borrow risk
+    /// @notice Borrow account- isolates borrow risk
     uint256 public constant BORROW_ACCOUNT = 123;
     /// @notice diBGT market ID
     uint256 public constant DIBGT_MARKET_ID = 38;
