@@ -43,7 +43,7 @@ clean integration with the Honeypot and Orderly protocols.
     * Checks market conditions before opening or closing positions
     * Handles **emergency stop** and **risk control** scenarios
 
-* **DiracUp.sol**
+* **DiracHoneypotV1.sol**
   The **main strategy contract**, orchestrating all interactions between the Dirac base contracts and the Honeypot Perps Protocol.
   Combines control, event emission, and data management into a unified on-chain strategy.
 

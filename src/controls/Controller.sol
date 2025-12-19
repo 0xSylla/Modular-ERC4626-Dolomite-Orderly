@@ -2,17 +2,31 @@
 pragma solidity ^0.8.10;
 
 import "../data/Data.sol";
-import  "../events/Events.sol";
+import "../events/Events.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {
+    IDolomiteMargin,
+    IDepositWithdrawalRouter,
+    AccountBalanceLib,
+    IBorrowPositionRouter
+} from "../interfaces/IDolomite.sol";
+import {IKXRouter} from "../interfaces/IKXRouter.sol";
 
-contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradeable, ReentrancyGuardUpgradeable {
-
+contract Controller is
+    Initializable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
+    // ============ Role Constants ============
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
     bytes32 public constant MANAGER_ROLE = keccak256("MANAGER_ROLE");
+
+    // ============ Core State Variables ============
     IERC20 public assetDeposit;
     address public ivault;
     mapping(address => bool) public whitelisted;
@@ -23,13 +37,48 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
     uint256 public currentTradeCycleId;
     uint256 public totalTVL;
 
+    // ============ Dolomite State Variables ============
+    /// @notice Total BERA received (gas refunds)
+    uint256 public totalReceived;
+    /// @notice Collateral token (iBGT)
+    IERC20 public collateralAsset;
+    /// @notice Borrow token (USDC)
+    IERC20 public borrowAsset;
+    /// @notice Total iBGT deposited to Dolomite
+    uint256 public totalCollateralDeposited;
+    /// @notice Total USDC borrowed from Dolomite
+    uint256 public totalAssetBorrowed;
+
+    // ============ Dolomite Constants ============
+    /// @notice Main vault account (0)
+    uint256 public constant MAIN_ACCOUNT = 0;
+    /// @notice Borrow account (123) - isolates borrow risk
+    uint256 public constant BORROW_ACCOUNT = 123;
+    /// @notice diBGT market ID
+    uint256 public constant DIBGT_MARKET_ID = 38;
+    /// @notice USDC market ID
+    uint256 public constant USDC_MARKET_ID = 2;
+
+    /// @notice Dolomite main contract
+    IDolomiteMargin public constant DOLOMITE_MARGIN =
+        IDolomiteMargin(0x003Ca23Fd5F0ca87D01F6eC6CD14A8AE60c2b97D);
+    /// @notice Dolomite deposit/withdrawal router
+    IDepositWithdrawalRouter public constant DEPOSIT_WITHDRAWAL_ROUTER =
+        IDepositWithdrawalRouter(0xf8b2c637A68cF6A17b1DF9F8992EeBeFf63d2dFf);
+    /// @notice Dolomite borrow position router
+    IBorrowPositionRouter public constant BORROW_POSITION_ROUTER =
+        IBorrowPositionRouter(0xF579b345cdA0860668b857De10ABD62442133D0F);
+    /// @notice Kodiak DEX router
+    IKXRouter public constant KXRouter =
+        IKXRouter(0x43Dac637c4383f91B4368041E7A8687da3806Cae);
+
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(){
+    constructor() {
         _disableInitializers();
     }
 
     /**
-    * @notice Pauses all contract operations.
+     * @notice Pauses all contract operations.
      * @dev Callable only by the admin.
      */
 
@@ -44,9 +93,10 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
         __Pausable_init();
         __ReentrancyGuard_init();
 
-
-
-        if (address(_assetDeposit) == address(0) || address(_ivault) == address(0)) {
+        if (
+            address(_assetDeposit) == address(0) ||
+            address(_ivault) == address(0)
+        ) {
             revert("Zero address provided");
         }
 
@@ -63,10 +113,9 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
      * @notice Unpauses contract operations.
      * @dev Callable only by the admin.
      */
-    function emergencyUnpause() external onlyRole(DEFAULT_ADMIN_ROLE){
+    function emergencyUnpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
-
 
     /**
      * @notice Modifier to restrict function execution to the admin role.
@@ -78,7 +127,6 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
         }
         _;
     }
-
 
     /**
      * @notice Modifier to restrict function execution when the trade cycle is closed.
@@ -96,12 +144,14 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
         _;
     }
 
-
     /**
-    * @notice Ends the current trade cycle.
+     * @notice Ends the current trade cycle.
      * @dev Marks the current cycle as ENDED, records the ending timestamp, increments the cycle ID, and emits a TradeCycleEnded event.
      */
-    function initializeCycle() external onlyRole(DEFAULT_ADMIN_ROLE)  whenNotPaused
+    function initializeCycle()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        whenNotPaused
     {
         currentTradeCycleId = 0;
         Data.TradeCycle storage tradeCycle = tradeCycles[currentTradeCycleId];
@@ -133,7 +183,7 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
     }
 
     /**
-    * @notice Updates the trade cycle duration.
+     * @notice Updates the trade cycle duration.
      * @dev Callable only by the admin.
      * @param _newTradeCycleEndDate The new end date for the trade cycle.
      */
@@ -156,7 +206,12 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
      * @notice Requests to end the current trade cycle.
      * @dev Only callable by the admin when the trade cycle status is OPEN and the contract is not paused.
      */
-    function requestToEndTradeCycle() external  onlyRole(DEFAULT_ADMIN_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused{
+    function requestToEndTradeCycle()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
         Data.TradeCycle storage tradeCycle = tradeCycles[currentTradeCycleId];
         tradeCycle.status = Data.TradeCycleStatus.PENDING;
 
@@ -168,12 +223,15 @@ contract Controller is Initializable, AccessControlUpgradeable, PausableUpgradea
      * @dev Only callable by the admin when the trade cycle status is PENDING and the contract is not paused.
      */
 
-    function endTradeCycle() external onlyRole(DEFAULT_ADMIN_ROLE) onlyTradeCycle(Data.TradeCycleStatus.PENDING) whenNotPaused {
+    function endTradeCycle()
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.PENDING)
+        whenNotPaused
+    {
         Data.TradeCycle storage tradeCycle = tradeCycles[currentTradeCycleId];
         tradeCycle.status = Data.TradeCycleStatus.CLOSED;
         tradeCycle.endedAt = uint40(block.timestamp);
         emit Events.TradeCycleEnded(currentTradeCycleId, tradeCycle.endedAt);
     }
-
-
 }

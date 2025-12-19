@@ -4,68 +4,20 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Controller} from "../controls/Controller.sol";
 import {IVault, VaultTypes} from "../interfaces/IOrderly.sol";
-import {IDolomiteMargin, IDepositWithdrawalRouter, AccountBalanceLib, IBorrowPositionRouter} from "../interfaces/IDolomite.sol";
+import {
+    IDolomiteMargin,
+    IDepositWithdrawalRouter,
+    AccountBalanceLib,
+    IBorrowPositionRouter
+} from "../interfaces/IDolomite.sol";
 import {Data} from "../data/Data.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
 import {Events} from "../events/Events.sol";
-import {TransferHelper} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
+import {
+    TransferHelper
+} from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
-contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
-
-    // ============ State Variables ============
-    
-    /// @notice Total BERA received (gas refunds)
-    uint256 public totalReceived;
-    /// @notice Collateral token (iBGT)
-    IERC20 public collateralAsset;
-    /// @notice Borrow token (USDC)
-    IERC20 public borrowAsset;
-    /// @notice Total iBGT deposited to Dolomite
-    uint256 public totalCollateralDeposited;
-    /// @notice Total USDC borrowed from Dolomite
-    uint256 public totalAssetBorrowed;
-
-    // ============ Constants ============
-    
-    /// @notice Main vault account (0)
-    uint256 public constant MAIN_ACCOUNT = 0;
-    /// @notice Borrow account (123) - isolates borrow risk
-    uint256 public constant BORROW_ACCOUNT = 123;
-    /// @notice diBGT market ID
-    uint256 public constant DIBGT_MARKET_ID = 38;
-    /// @notice USDC market ID
-    uint256 public constant USDC_MARKET_ID = 2;
-
-    /// @notice Dolomite main contract
-    IDolomiteMargin public constant DOLOMITE_MARGIN = 
-        IDolomiteMargin(0x003Ca23Fd5F0ca87D01F6eC6CD14A8AE60c2b97D);
-    /// @notice Dolomite deposit/withdrawal router
-    IDepositWithdrawalRouter public constant DEPOSIT_WITHDRAWAL_ROUTER = 
-        IDepositWithdrawalRouter(0xf8b2c637A68cF6A17b1DF9F8992EeBeFf63d2dFf);
-    /// @notice Dolomite borrow position router
-    IBorrowPositionRouter public constant BORROW_POSITION_ROUTER = 
-        IBorrowPositionRouter(0xF579b345cdA0860668b857De10ABD62442133D0F);
-    /// @notice Kodiak DEX router
-    IKXRouter public constant KXRouter = 
-        IKXRouter(0x43Dac637c4383f91B4368041E7A8687da3806Cae);
-
-    // Events
-    event CollateralSupplied(uint256 amount);
-    event AssetBorrowed(uint256 amount);
-    event DebtRepaid(uint256 amount);
-    event CollateralWithdrawn(uint256 amount);
-    event ContractFunded(uint256 amount);
-    event ContractWithdrawn(uint256 amount);
-    event OperatorsSet(address[] operators, bool[] trusted);
-    event BorrowPositionOpened(uint256 collateralAmount, uint256 borrowAmount);
-    // Errors
-    error Unauthorized();
-    error ZeroAmount();
-    error InsufficientBalance();
-    error TransferFailed();
-    error DebtExists();
-
-
+contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -83,8 +35,10 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         address _borrowAsset,
         IERC20 _assetDeposit
     ) external initializer {
-
-        if (address(_assetDeposit) == address(0) || address(_ivault) == address(0)) {
+        if (
+            address(_assetDeposit) == address(0) ||
+            address(_ivault) == address(0)
+        ) {
             revert Events.ZeroAddress();
         }
 
@@ -98,7 +52,6 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         _setOperators();
     }
 
-
     /**
      * @notice Deposits assets and mints corresponding shares.
      * @dev Only allowed when the trade cycle status is INIT and the caller is whitelisted.
@@ -110,12 +63,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         uint256 _assets,
         address _receiver
     )
-    public
-    override
-    whenTradeClosed
-    whenNotPaused
-    nonReentrant
-    returns (uint256 shares)
+        public
+        override
+        whenTradeClosed
+        whenNotPaused
+        nonReentrant
+        returns (uint256 shares)
     {
         if (_assets == 0) {
             revert Events.ZeroAmount();
@@ -143,12 +96,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         uint256 _shares,
         address _receiver
     )
-    public
-    override
-    whenTradeClosed
-    whenNotPaused
-    nonReentrant
-    returns (uint256 assets)
+        public
+        override
+        whenTradeClosed
+        whenNotPaused
+        nonReentrant
+        returns (uint256 assets)
     {
         assets = convertToAssets(_shares);
         if (assets == 0) {
@@ -175,12 +128,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         address _receiver,
         address _owner
     )
-    public
-    override
-    whenTradeClosed
-    whenNotPaused
-    nonReentrant
-    returns (uint256 shares)
+        public
+        override
+        whenTradeClosed
+        whenNotPaused
+        nonReentrant
+        returns (uint256 shares)
     {
         if (_assets == 0) {
             revert Events.ZeroAmount();
@@ -190,7 +143,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             userDeposits[msg.sender] -= _assets;
         } else {
             delete userDeposits[msg.sender];
-            if(totalUsers > 0) {
+            if (totalUsers > 0) {
                 totalUsers--;
             }
         }
@@ -212,12 +165,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         address _receiver,
         address _owner
     )
-    public
-    override
-    whenTradeClosed
-    whenNotPaused
-    nonReentrant
-    returns (uint256 assets)
+        public
+        override
+        whenTradeClosed
+        whenNotPaused
+        nonReentrant
+        returns (uint256 assets)
     {
         assets = super.redeem(_shares, _receiver, _owner);
 
@@ -243,12 +196,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
     //    return super.totalAssets() + totalCollateralDeposited;
     //}
     ////////////////////////////////////////////////////////////////////////////
-    //////////////////////////// SWAP FUNCTIONS ////////////////////////////////    
+    //////////////////////////// SWAP FUNCTIONS ////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
     /*
-   *
-   *
-   * @notice Executes a token swap using the KXRouter.
+     *
+     *
+     * @notice Executes a token swap using the KXRouter.
      * @dev Approves the input token for the router, constructs input and output parameters,
      * and calls the swap function on the KXRouter.
      * @param tokenIn The address of the input token.
@@ -261,48 +214,48 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @param feeDatas The fee data including fee quote, surplus fee, referral code, and referral fee.
      * @param _spender The address to approve the input token for (typically the KXRouter).
      */
-    function swapKodiak(address tokenIn, bool wrapIn, uint256 amountIn, address tokenOut, bool unwrapOut, uint256 minAmountOut, IKXRouter.SwapData calldata swapDatas, IKXRouter.FeeData calldata feeDatas, address _spender) external  nonReentrant onlyRole(OPERATOR_ROLE)  {
-
+    function swapKodiak(
+        address tokenIn,
+        bool wrapIn,
+        uint256 amountIn,
+        address tokenOut,
+        bool unwrapOut,
+        uint256 minAmountOut,
+        IKXRouter.SwapData calldata swapDatas,
+        IKXRouter.FeeData calldata feeDatas,
+        address _spender
+    ) external nonReentrant onlyRole(OPERATOR_ROLE) {
         IKXRouter.InputAmount memory input = IKXRouter.InputAmount({
-            token : tokenIn,
-            wrap : wrapIn,
-            amount :amountIn
+            token: tokenIn,
+            wrap: wrapIn,
+            amount: amountIn
         });
 
-        IKXRouter.OutputAmount memory output =  IKXRouter.OutputAmount({
-            token : tokenOut,
-            unwrap :unwrapOut,
-            minAmountOut : minAmountOut,
-            receiver : address(this)
-
+        IKXRouter.OutputAmount memory output = IKXRouter.OutputAmount({
+            token: tokenOut,
+            unwrap: unwrapOut,
+            minAmountOut: minAmountOut,
+            receiver: address(this)
         });
 
-        TransferHelper.safeApprove(
-            tokenIn,
-            _spender,
-            amountIn
-        );
+        TransferHelper.safeApprove(tokenIn, _spender, amountIn);
 
-        KXRouter.swap(
-            input,
-            output,
-            swapDatas,
-            feeDatas
-        );
+        KXRouter.swap(input, output, swapDatas, feeDatas);
     }
     ////////////////////////////////////////////////////////////////////////////
-    //////////////////////// ORDERLY FUNCTIONS /////////////////////////////////    
+    //////////////////////// ORDERLY FUNCTIONS /////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
-    
+
     /**
      * @notice Delegates signer for Orderly
      * @param data The data for the delegate signer
      * @dev Only allowed when the trade cycle status is INIT and the caller is whitelisted.
      */
-    function delegateSigner( VaultTypes.VaultDelegate calldata data) external     nonReentrant onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function delegateSigner(
+        VaultTypes.VaultDelegate calldata data
+    ) external nonReentrant onlyRole(OPERATOR_ROLE) whenNotPaused {
         IVault(address(ivault)).delegateSigner(data);
-        emit Events.DelegateSignerSet( data.brokerHash,  data.delegateSigner);
-
+        emit Events.DelegateSignerSet(data.brokerHash, data.delegateSigner);
     }
 
     /**
@@ -310,9 +263,12 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @param data The data for the deposit
      * @param fee The fee for the deposit
      */
-    function depositToOrderly(VaultTypes.VaultDepositFE calldata data, uint256  fee) external nonReentrant  onlyRole(OPERATOR_ROLE)  whenNotPaused {
+    function depositToOrderly(
+        VaultTypes.VaultDepositFE calldata data,
+        uint256 fee
+    ) external nonReentrant onlyRole(OPERATOR_ROLE) whenNotPaused {
         IERC20(assetDeposit).approve(ivault, data.tokenAmount);
-        IVault(ivault).deposit{value: fee }(data);
+        IVault(ivault).deposit{value: fee}(data);
     }
 
     ////////////////////////////////////////////////////////////////////////////
@@ -324,13 +280,14 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @dev Must be called to allow routers to manipulate this contract's accounts
      */
     function _setOperators() internal {
-        IDolomiteMargin.OperatorArg[] memory args = new IDolomiteMargin.OperatorArg[](1);
-        
+        IDolomiteMargin.OperatorArg[]
+            memory args = new IDolomiteMargin.OperatorArg[](1);
+
         args[0] = IDolomiteMargin.OperatorArg({
             operator: address(DEPOSIT_WITHDRAWAL_ROUTER),
             trusted: true
         });
-        
+
         DOLOMITE_MARGIN.setOperators(args);
     }
 
@@ -338,15 +295,23 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @notice Supply iBGT to Dolomite as collateral
      * @param _amount Amount of iBGT to supply
      */
-    function supplyCollateralToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
-        if (_amount == 0) revert ZeroAmount();
-        
+    function supplyCollateralToDolomite(
+        uint256 _amount
+    )
+        external
+        nonReentrant
+        onlyRole(OPERATOR_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
+        if (_amount == 0) revert Events.ZeroAmount();
+
         uint256 contractBalance = collateralAsset.balanceOf(address(this));
-        if (_amount > contractBalance) revert InsufficientBalance();
-        
+        if (_amount > contractBalance) revert Events.InsufficientBalance();
+
         // Approve Dolomite router
         collateralAsset.approve(address(DEPOSIT_WITHDRAWAL_ROUTER), _amount);
-        
+
         // Deposit to Dolomite account 0
         DEPOSIT_WITHDRAWAL_ROUTER.depositWei(
             DIBGT_MARKET_ID,
@@ -355,25 +320,33 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             _amount,
             IDepositWithdrawalRouter.EventFlag.None
         );
-        
+
         totalCollateralDeposited += _amount;
-        
-        emit CollateralSupplied(_amount);
+
+        emit Events.CollateralSupplied(_amount);
     }
 
     /**
      * @notice Borrow USDC against iBGT collateral
      * @param _borrowAmount Amount of ETH to borrow (in wei, 18 decimals)
      */
-    function borrowAssetFromDolomite(uint256 _borrowAmount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
-        if (_borrowAmount == 0) revert ZeroAmount();
-        
+    function borrowAssetFromDolomite(
+        uint256 _borrowAmount
+    )
+        external
+        nonReentrant
+        onlyRole(OPERATOR_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
+        if (_borrowAmount == 0) revert Events.ZeroAmount();
+
         // Open borrow position and transfer collateral from vault account to borrow account
         BORROW_POSITION_ROUTER.openBorrowPosition(
-            MAIN_ACCOUNT,  // fromAccountNumber
-            BORROW_ACCOUNT,  // toAccountNumber
-            DIBGT_MARKET_ID,   // collteralMarketId
-            totalCollateralDeposited,      // collateralAmount
+            MAIN_ACCOUNT, // fromAccountNumber
+            BORROW_ACCOUNT, // toAccountNumber
+            DIBGT_MARKET_ID, // collteralMarketId
+            totalCollateralDeposited, // collateralAmount
             IBorrowPositionRouter.BalanceCheckFlag.From
         );
 
@@ -386,7 +359,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             _borrowAmount,
             IBorrowPositionRouter.BalanceCheckFlag.To
         );
-        
+
         totalAssetBorrowed += _borrowAmount;
 
         // Withdraw USDC borrowed from Dolomite
@@ -397,8 +370,8 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             _borrowAmount,
             IDepositWithdrawalRouter.EventFlag.None
         );
-        
-        emit AssetBorrowed(_borrowAmount);
+
+        emit Events.AssetBorrowed(_borrowAmount);
     }
 
     /**
@@ -406,7 +379,15 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @param _amount Amount to repay (0 = repay with 10% buffer for interest)
      * @dev After this, collateral will be back in account 0 (still in Dolomite)
      */
-    function repayDebtToDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
+    function repayDebtToDolomite(
+        uint256 _amount
+    )
+        external
+        nonReentrant
+        onlyRole(OPERATOR_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
         uint256 repayAmount = _amount;
 
         if (repayAmount == 0) {
@@ -414,11 +395,11 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             repayAmount = (totalAssetBorrowed * 110) / 100;
         }
 
-        if (repayAmount == 0) revert ZeroAmount();
+        if (repayAmount == 0) revert Events.ZeroAmount();
 
         // Approve and deposit USDC to account 0
         borrowAsset.approve(address(DEPOSIT_WITHDRAWAL_ROUTER), repayAmount);
-        
+
         DEPOSIT_WITHDRAWAL_ROUTER.depositWei(
             0,
             MAIN_ACCOUNT,
@@ -426,7 +407,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             repayAmount,
             IDepositWithdrawalRouter.EventFlag.None
         );
-        
+
         // Repay all debt in borrow account using funds from main account
         BORROW_POSITION_ROUTER.repayAllForBorrowPosition(
             DIBGT_MARKET_ID,
@@ -449,7 +430,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
         // Reset debt tracking
         totalAssetBorrowed = 0;
 
-        emit DebtRepaid(repayAmount);
+        emit Events.DebtRepaid(repayAmount);
         //emit BorrowPositionClosed(repayAmount);
     }
 
@@ -458,19 +439,28 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @param _amount Amount of iBGT to withdraw (0 = withdraw all)
      * @dev Requires all debt to be repaid first
      */
-    function withdrawCollateralFromDolomite(uint256 _amount) external nonReentrant  onlyRole(OPERATOR_ROLE) onlyTradeCycle(Data.TradeCycleStatus.OPEN) whenNotPaused {
-        if (totalAssetBorrowed > 0) revert DebtExists();
-        
+    function withdrawCollateralFromDolomite(
+        uint256 _amount
+    )
+        external
+        nonReentrant
+        onlyRole(OPERATOR_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
+        if (totalAssetBorrowed > 0) revert Events.DebtExists();
+
         uint256 withdrawAmount = _amount;
-        
+
         // If amount is 0, withdraw all
         if (withdrawAmount == 0) {
             withdrawAmount = totalCollateralDeposited;
         }
-        
-        if (withdrawAmount == 0) revert ZeroAmount();
-        if (withdrawAmount > totalCollateralDeposited) revert InsufficientBalance();
-        
+
+        if (withdrawAmount == 0) revert Events.ZeroAmount();
+        if (withdrawAmount > totalCollateralDeposited)
+            revert Events.InsufficientBalance();
+
         // Withdraw iBGT from Dolomite
         DEPOSIT_WITHDRAWAL_ROUTER.withdrawWei(
             DIBGT_MARKET_ID,
@@ -479,79 +469,75 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
             withdrawAmount,
             IDepositWithdrawalRouter.EventFlag.None
         );
-        
+
         totalCollateralDeposited -= withdrawAmount;
-        
-        emit CollateralWithdrawn(withdrawAmount);
+
+        emit Events.CollateralWithdrawn(withdrawAmount);
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    /////////////////////////// VIEW FUNCTIONS /////////////////////////////////    
+    /////////////////////////// VIEW FUNCTIONS /////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////
 
     /**
-     * @notice Get balances for BORROW_ACCOUNT 
+     * @notice Get balances for BORROW_ACCOUNT
      * @return collateralBalance iBGT collateral (positive) or debt (negative)
      * @return borrowBalance USDC balance (positive) or debt (negative)
      */
-    function getDebtAccountBalanceFromDolomite() public view returns (
-        int256 collateralBalance,
-        int256 borrowBalance
-    ) {
+    function getDebtAccountBalanceFromDolomite()
+        public
+        view
+        returns (int256 collateralBalance, int256 borrowBalance)
+    {
         // Get iBGT collateral balance
-        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN.getAccountWei(
-            address(this),
-            BORROW_ACCOUNT,
-            DIBGT_MARKET_ID
-        );
-        
+        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN
+            .getAccountWei(address(this), BORROW_ACCOUNT, DIBGT_MARKET_ID);
+
         // Get USDC debt balance
         IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
             address(this),
             BORROW_ACCOUNT,
             USDC_MARKET_ID
         );
-        
+
         // Convert Wei to signed int256
-        collateralBalance = collateralWei.sign 
-            ? int256(collateralWei.value) 
+        collateralBalance = collateralWei.sign
+            ? int256(collateralWei.value)
             : -int256(collateralWei.value);
-        
-        borrowBalance = borrowWei.sign 
-            ? int256(borrowWei.value) 
+
+        borrowBalance = borrowWei.sign
+            ? int256(borrowWei.value)
             : -int256(borrowWei.value);
     }
-    
+
     /**
      * @notice Get balances for MAIN_ACCOUNT (account 0)
      * @return collateralBalance iBGT balance (positive) or debt (negative)
      * @return borrowBalance USDC balance (positive) or debt (negative)
      */
-    function getMainAccountBalanceFromDolomite() public view returns (
-        int256 collateralBalance,
-        int256 borrowBalance
-    ) {
+    function getMainAccountBalanceFromDolomite()
+        public
+        view
+        returns (int256 collateralBalance, int256 borrowBalance)
+    {
         // Get iBGT balance
-        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN.getAccountWei(
-            address(this),
-            MAIN_ACCOUNT,
-            DIBGT_MARKET_ID
-        );
-        
+        IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN
+            .getAccountWei(address(this), MAIN_ACCOUNT, DIBGT_MARKET_ID);
+
         // Get USDC balance
         IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
             address(this),
             MAIN_ACCOUNT,
             USDC_MARKET_ID
         );
-        
+
         // Convert Wei to signed int256
-        collateralBalance = collateralWei.sign 
-            ? int256(collateralWei.value) 
+        collateralBalance = collateralWei.sign
+            ? int256(collateralWei.value)
             : -int256(collateralWei.value);
-        
-        borrowBalance = borrowWei.sign 
-            ? int256(borrowWei.value) 
+
+        borrowBalance = borrowWei.sign
+            ? int256(borrowWei.value)
             : -int256(borrowWei.value);
     }
 
@@ -560,7 +546,9 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @return collateral Total iBGT in Dolomite
      * @return borrowed Total USDC debt
      */
-    function getDolomitePosition() external view
+    function getDolomitePosition()
+        external
+        view
         returns (uint256 collateral, uint256 borrowed)
     {
         return (totalCollateralDeposited, totalAssetBorrowed);
@@ -572,7 +560,9 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      * @return USDC balance
      * @return Deposit asset balance
      */
-    function getContractBalances() external view
+    function getContractBalances()
+        external
+        view
         returns (uint256, uint256, uint256)
     {
         return (
@@ -588,7 +578,9 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
      */
     function getLeverageRatio() external view returns (uint256) {
         if (totalCollateralDeposited == 0) return 1e18;
-        return ((totalCollateralDeposited + totalAssetBorrowed) * 1e18) / totalCollateralDeposited;
+        return
+            ((totalCollateralDeposited + totalAssetBorrowed) * 1e18) /
+            totalCollateralDeposited;
     }
 
     /**
@@ -598,7 +590,6 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable{
     receive() external payable {
         totalReceived += msg.value;
     }
-
 
     fallback() external payable {
         totalReceived += msg.value;
