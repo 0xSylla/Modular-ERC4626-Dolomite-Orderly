@@ -56,7 +56,7 @@ clean integration with the Honeypot and Orderly protocols.
 | **Events**        | `Events.sol`                      | Emits key protocol events             |
 | **Data**          | `Data.sol`                        | Defines structs, enums, and constants |
 | **Interfaces**    | `interfaces/`                     | Contract integration interfaces       |
-| **Controller**    | `src/contracts/Controller.sol`    | Risk & strategy control logic         |
+| **Controller**    | `src/contracts/Controller.sol`    | Vault control logic         |
 | **DiracHoneypotV1** | `src/contracts/DiracHoneypotV1.sol` | Core strategy logic                   |
 
 ---
