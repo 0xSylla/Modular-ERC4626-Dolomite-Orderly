@@ -8,7 +8,8 @@ import {
     IDolomiteMargin,
     IDepositWithdrawalRouter,
     AccountBalanceLib,
-    IBorrowPositionRouter
+    IBorrowPositionRouter,
+    IDolomiteIsolationModeToken
 } from "../interfaces/IDolomite.sol";
 import {Data} from "../data/Data.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
@@ -492,13 +493,26 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         returns (int256 collateralBalance, int256 borrowBalance)
     {
         // Get iBGT collateral balance
+        address dolomiteOwner = IDolomiteIsolationModeToken(
+            DOLOMITE_MARGIN.getMarketTokenAddress(DIBGT_MARKET_ID)
+        ).getVaultByAccount(address(this));
+        if (dolomiteOwner == address(0)) dolomiteOwner = address(this);
+
         IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN
-            .getAccountWei(address(this), BORROW_ACCOUNT, DIBGT_MARKET_ID);
+            .getAccountWei(
+                IDolomiteMargin.AccountInfo({
+                    owner: dolomiteOwner,
+                    number: BORROW_ACCOUNT
+                }),
+                DIBGT_MARKET_ID
+            );
 
         // Get USDC debt balance
         IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
-            address(this),
-            BORROW_ACCOUNT,
+            IDolomiteMargin.AccountInfo({
+                owner: dolomiteOwner,
+                number: BORROW_ACCOUNT
+            }),
             USDC_MARKET_ID
         );
 
@@ -523,13 +537,26 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         returns (int256 collateralBalance, int256 borrowBalance)
     {
         // Get iBGT balance
+        address dolomiteOwner = IDolomiteIsolationModeToken(
+            DOLOMITE_MARGIN.getMarketTokenAddress(DIBGT_MARKET_ID)
+        ).getVaultByAccount(address(this));
+        if (dolomiteOwner == address(0)) dolomiteOwner = address(this);
+
         IDolomiteMargin.Wei memory collateralWei = DOLOMITE_MARGIN
-            .getAccountWei(address(this), MAIN_ACCOUNT, DIBGT_MARKET_ID);
+            .getAccountWei(
+                IDolomiteMargin.AccountInfo({
+                    owner: dolomiteOwner,
+                    number: MAIN_ACCOUNT
+                }),
+                DIBGT_MARKET_ID
+            );
 
         // Get USDC balance
         IDolomiteMargin.Wei memory borrowWei = DOLOMITE_MARGIN.getAccountWei(
-            address(this),
-            MAIN_ACCOUNT,
+            IDolomiteMargin.AccountInfo({
+                owner: dolomiteOwner,
+                number: MAIN_ACCOUNT
+            }),
             USDC_MARKET_ID
         );
 

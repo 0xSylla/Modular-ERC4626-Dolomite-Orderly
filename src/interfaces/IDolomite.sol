@@ -3,29 +3,29 @@ pragma solidity ^0.8.10;
 
 interface IDolomiteMargin {
     enum ActionType {
-        Deposit,   // 0: Supply tokens
-        Withdraw,  // 1: Borrow tokens or withdraw
-        Transfer,  // 2: Transfer between accounts
-        Buy,       // 3: Buy tokens
-        Sell,      // 4: Sell tokens
-        Trade,     // 5: Trade tokens
+        Deposit, // 0: Supply tokens
+        Withdraw, // 1: Borrow tokens or withdraw
+        Transfer, // 2: Transfer between accounts
+        Buy, // 3: Buy tokens
+        Sell, // 4: Sell tokens
+        Trade, // 5: Trade tokens
         Liquidate, // 6: Liquidate account
-        Vaporize,  // 7: Vaporize account
-        Call       // 8: Call external contract
+        Vaporize, // 7: Vaporize account
+        Call // 8: Call external contract
     }
 
     enum AssetDenomination {
         Wei, // 0: Token amount
-        Par  // 1: Principal amount
+        Par // 1: Principal amount
     }
 
     enum AssetReference {
-        Delta,  // 0: Relative amount
-        Target  // 1: Absolute amount
+        Delta, // 0: Relative amount
+        Target // 1: Absolute amount
     }
 
     struct AssetAmount {
-        bool sign;                  // true = positive, false = negative
+        bool sign; // true = positive, false = negative
         AssetDenomination denomination;
         AssetReference ref;
         uint256 value;
@@ -53,16 +53,15 @@ interface IDolomiteMargin {
     }
 
     struct Wei {
-        bool sign;   // true = positive, false = negative
+        bool sign; // true = positive, false = negative
         uint256 value; // absolute value
-    }  
+    }
 
     function getAccountWei(
-        address account,
-        uint256 accountNumber,
+        AccountInfo memory account,
         uint256 marketId
     ) external view returns (Wei memory);
-    
+
     function setOperators(OperatorArg[] calldata args) external;
 
     function operate(
@@ -70,14 +69,20 @@ interface IDolomiteMargin {
         ActionArgs[] calldata actions
     ) external;
 
-    function getMarketIdByTokenAddress(address token) external view returns (uint256);
+    function getMarketIdByTokenAddress(
+        address token
+    ) external view returns (uint256);
+
+    function getMarketTokenAddress(
+        uint256 marketId
+    ) external view returns (address);
 }
 
 interface IDepositWithdrawalRouter {
     enum EventFlag {
         None
     }
-    
+
     function depositWei(
         uint256 isolationModeMarketId,
         uint256 toAccountNumber,
@@ -85,7 +90,7 @@ interface IDepositWithdrawalRouter {
         uint256 amountWei,
         EventFlag eventFlag
     ) external;
-    
+
     function withdrawWei(
         uint256 isolationModeMarketId,
         uint256 fromAccountNumber,
@@ -148,7 +153,7 @@ interface IBorrowPositionRouter {
         uint256 _marketId,
         AccountBalanceLib.BalanceCheckFlag _balanceCheckFlag
     ) external;
-    
+
     /**
      * @param _isolationModeMarketId  The market ID of the isolation mode token
      *                                (0 if not using isolation mode)
@@ -162,5 +167,10 @@ interface IBorrowPositionRouter {
         uint256 _toAccountNumber,
         uint256[] calldata _collateralMarketIds
     ) external;
+}
 
+interface IDolomiteIsolationModeToken {
+    function getVaultByAccount(
+        address _account
+    ) external view returns (address);
 }

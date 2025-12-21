@@ -306,7 +306,7 @@ contract DiracHoneyPotV1Test is Test {
 
         // ========== STEP 5: Borrow USDC from Dolomite ==========
         // Use minimal borrow amount to avoid exceeding Dolomite's max borrow limits
-        uint256 borrowAmount = 5 * 1e18; // 5 USDC in 18 decimals (Dolomite format)
+        uint256 borrowAmount = 5 * 1e6; // 5 USDC in 6 decimals
 
         uint256 vaultUsdcBefore = IERC20(USDC).balanceOf(address(vault));
 
@@ -324,7 +324,7 @@ contract DiracHoneyPotV1Test is Test {
         assertGt(IERC20(USDC).balanceOf(address(vault)), vaultUsdcBefore);
 
         // ========== STEP 6: Deposit to Orderly ==========
-        uint256 orderlyDepositAmount = borrowAmount / 1e12; // Convert to 6 decimals
+        uint256 orderlyDepositAmount = borrowAmount; // Already 6 decimals
 
         VaultTypes.VaultDepositFE memory depositData = VaultTypes
             .VaultDepositFE({
@@ -352,7 +352,7 @@ contract DiracHoneyPotV1Test is Test {
 
         (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
         console.log("Collateral in Dolomite:", collateral / 1e18, "iBGT");
-        console.log("Debt in Dolomite:", borrowed / 1e18, "USDC");
+        console.log("Debt in Dolomite:", borrowed / 1e6, "USDC");
 
         (int256 collateralInBorrow, int256 debtInBorrow) = vault
             .getDebtAccountBalanceFromDolomite();
@@ -360,7 +360,7 @@ contract DiracHoneyPotV1Test is Test {
             "Borrow Account Collateral:",
             uint256(collateralInBorrow) / 1e18
         );
-        console.log("Borrow Account Debt:", uint256(-debtInBorrow) / 1e18);
+        console.log("Borrow Account Debt:", uint256(-debtInBorrow) / 1e6);
 
         // Assertions
         assertGt(leverageRatio, 1e18, "Should be leveraged (>1x)");
@@ -400,16 +400,16 @@ contract DiracHoneyPotV1Test is Test {
         deal(iBGT, address(vault), ibgtAmount);
         vault.supplyCollateralToDolomite(ibgtAmount);
 
-        uint256 borrowAmount = 5 * 1e18; // 5 USDC - minimal amount to avoid LTV limits
+        uint256 borrowAmount = 5 * 1e6; // 5 USDC - minimal amount to avoid LTV limits
         vault.borrowAssetFromDolomite(borrowAmount);
 
-        console.log("Position opened with", borrowAmount / 1e18, "USDC debt");
+        console.log("Position opened with", borrowAmount / 1e6, "USDC debt");
 
         // ========== Unwind Process ==========
 
         // Step 1: Ensure vault has USDC to repay (simulate profit or funding)
         uint256 repayAmount = (borrowAmount * 110) / 100; // 10% buffer for interest
-        deal(USDC, address(vault), repayAmount / 1e12); // Convert to 6 decimals
+        deal(USDC, address(vault), repayAmount); // 6 decimals
 
         // Step 2: Repay debt
         vault.repayDebtToDolomite(0); // 0 = auto-calculate with buffer
@@ -433,9 +433,10 @@ contract DiracHoneyPotV1Test is Test {
         vm.stopPrank();
 
         // Step 5: Close trade cycle
-        vm.prank(admin);
+        vm.startPrank(admin);
         vault.requestToEndTradeCycle();
         vault.endTradeCycle();
+        vm.stopPrank();
 
         console.log("Trade cycle closed");
 
@@ -481,7 +482,7 @@ contract DiracHoneyPotV1Test is Test {
 
     function test_BorrowAssetFromDolomite() public {
         uint256 collateralAmount = 100 ether; // 100 iBGT
-        uint256 borrowAmount = 1 * 1e18; // 1 USDC in 18 decimals - minimal to avoid LTV limits
+        uint256 borrowAmount = 1 * 1e6; // 1 USDC in 6 decimals - minimal to avoid LTV limits
 
         deal(iBGT, address(vault), collateralAmount);
 
@@ -508,7 +509,7 @@ contract DiracHoneyPotV1Test is Test {
 
     function test_RepayDebtToDolomite() public {
         uint256 collateralAmount = 100 ether;
-        uint256 borrowAmount = 1 * 1e18; // 1 USDC - minimal to avoid LTV limits
+        uint256 borrowAmount = 1 * 1e6; // 1 USDC - minimal to avoid LTV limits
 
         // Setup position
         deal(iBGT, address(vault), collateralAmount);
@@ -522,8 +523,8 @@ contract DiracHoneyPotV1Test is Test {
         vault.borrowAssetFromDolomite(borrowAmount);
 
         // Get USDC to repay
-        uint256 repayAmount = borrowAmount + (borrowAmount * 110) / 100;
-        deal(USDC, address(vault), repayAmount / 1e12); // 6 decimals
+        uint256 repayAmount = borrowAmount + (borrowAmount * 10) / 100;
+        deal(USDC, address(vault), repayAmount); // 6 decimals
 
         vault.repayDebtToDolomite(0);
 
@@ -540,7 +541,7 @@ contract DiracHoneyPotV1Test is Test {
         assertEq(vault.getLeverageRatio(), 1e18, "No leverage initially");
 
         uint256 collateral = 10000 ether;
-        uint256 borrowed = 5 * 1e18; // 5 USDC - minimal to avoid LTV limits
+        uint256 borrowed = 5 * 1e6; // 5 USDC - minimal to avoid LTV limits
 
         deal(iBGT, address(vault), collateral);
 
@@ -569,7 +570,7 @@ contract DiracHoneyPotV1Test is Test {
 
         vm.startPrank(operator);
         vault.supplyCollateralToDolomite(1000 ether);
-        vault.borrowAssetFromDolomite(5 * 1e18); // 5 USDC - minimal to avoid LTV limits
+        vault.borrowAssetFromDolomite(5 * 1e6); // 5 USDC - minimal to avoid LTV limits
 
         vm.expectRevert(Events.DebtExists.selector);
         vault.withdrawCollateralFromDolomite(1000 ether);
@@ -620,13 +621,13 @@ contract DiracHoneyPotV1Test is Test {
 
         vm.startPrank(operator);
         vault.supplyCollateralToDolomite(1000 ether);
-        vault.borrowAssetFromDolomite(500 * 1e18);
+        vault.borrowAssetFromDolomite(5 * 1e6); // 5 USDC
         vm.stopPrank();
 
         (uint256 collateral, uint256 borrowed) = vault.getDolomitePosition();
 
         assertEq(collateral, 1000 ether);
-        assertEq(borrowed, 500 * 1e18);
+        assertEq(borrowed, 5 * 1e6);
     }
 
     // ============================================
