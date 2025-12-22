@@ -230,7 +230,7 @@ contract DiracHoneyPotV1Test is Test {
     }
 
     // ============================================
-    // Full Strategy Flow Test (Work in Progress)
+    // Full Strategy Flow Test
     // ============================================
 
     /**
@@ -374,7 +374,7 @@ contract DiracHoneyPotV1Test is Test {
     }
 
     // ============================================
-    // Unwind Position Test(Work in Progress)
+    // Unwind Position Test
     // ============================================
 
     function test_UnwindPosition() public {
@@ -452,7 +452,7 @@ contract DiracHoneyPotV1Test is Test {
     }
 
     // ============================================
-    // Dolomite Integration Tests(Work in Progress)
+    // Dolomite Integration Tests
     // ============================================
 
     function test_SupplyCollateralToDolomite() public {
