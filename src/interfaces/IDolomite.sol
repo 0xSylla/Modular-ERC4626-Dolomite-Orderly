@@ -174,3 +174,11 @@ interface IDolomiteIsolationModeToken {
         address _account
     ) external view returns (address);
 }
+
+interface IsolationModeUpgradeableProxy {
+    /**
+     * @notice Claims rewards from the underlying staking protocol
+     * @dev This is the standard getReward function used by many reward vaults
+     */
+    function getReward() external;
+}

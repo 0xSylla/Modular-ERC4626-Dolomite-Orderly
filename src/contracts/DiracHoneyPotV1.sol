@@ -9,7 +9,8 @@ import {
     IDepositWithdrawalRouter,
     AccountBalanceLib,
     IBorrowPositionRouter,
-    IDolomiteIsolationModeToken
+    IDolomiteIsolationModeToken,
+    IsolationModeUpgradeableProxy
 } from "../interfaces/IDolomite.sol";
 import {Data} from "../data/Data.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
@@ -477,7 +478,15 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
         emit Events.CollateralWithdrawn(withdrawAmount);
     }
-
+    /**
+     * @notice Claims rewards from the underlying staking protocol
+     * @param _add Address of Dolomite IsolationModeUpgradeableProxy
+     * @dev This is the standard getReward function used by many reward vaults
+     */
+    function claimRewardsFromDolomite(address _add) external {
+        IsolationModeUpgradeableProxy(_add).getReward();
+        emit Events.ClaimedRewards();
+    }
     ////////////////////////////////////////////////////////////////////////////
     /////////////////////////// VIEW FUNCTIONS /////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////

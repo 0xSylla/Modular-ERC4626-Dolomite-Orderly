@@ -25,6 +25,7 @@ library Events {
     event CollateralWithdrawn(uint256 amount);
     event ContractFunded(uint256 amount);
     event ContractWithdrawn(uint256 amount);
+    event ClaimedRewards();
     event OperatorsSet(address[] operators, bool[] trusted);
     event BorrowPositionOpened(uint256 collateralAmount, uint256 borrowAmount);
 
