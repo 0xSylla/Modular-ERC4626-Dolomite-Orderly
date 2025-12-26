@@ -483,7 +483,16 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
      * @param _add Address of Dolomite IsolationModeUpgradeableProxy
      * @dev This is the standard getReward function used by many reward vaults
      */
-    function claimRewardsFromDolomite(address _add) external {
+    function claimRewardsFromDolomite(
+        address _add
+    )
+        external
+        onlyRole(OPERATOR_ROLE)
+        whenNotPaused
+        nonReentrant
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+    {
+        if (_add == address(0)) revert Events.ZeroAddress();
         IsolationModeUpgradeableProxy(_add).getReward();
         emit Events.ClaimedRewards();
     }
