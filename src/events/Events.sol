@@ -41,4 +41,5 @@ library Events {
     error InsufficientBalance();
     error TransferFailed();
     error DebtExists();
+    error NoCollateralToZap();
 }

@@ -467,7 +467,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         if (zapAmount == 0) {
             // Get collateral balance in borrow account (in diBGT)
             (int256 collateralBalance, ) = getDebtAccountBalanceFromDolomite();
-            require(collateralBalance > 0, "No collateral to zap");
+            if (collateralBalance < 0) revert Events.NoCollateralToZap();
             zapAmount = uint256(collateralBalance);
         }
 
