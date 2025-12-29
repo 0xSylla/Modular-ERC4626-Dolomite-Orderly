@@ -17,12 +17,27 @@ interface IDiracHoneyPotV1 is IERC4626 {
     // Events
     // ============================================
 
+    event DelegateSignerSet(
+        bytes32 indexed brokerHash,
+        address indexed delegateSigner
+    );
+    event TradeCycleStarted(
+        uint256 indexed tradeCycleId,
+        uint256 honeyDeposit,
+        uint256 startedAt,
+        uint256 expiresAt
+    );
+    event TradeCyclePendingEnd(uint256 indexed tradeCycleId);
+    event TradeCycleInit(uint256 indexed tradeCycleId);
+    event TradeCycleEnded(uint256 indexed tradeCycleId, uint256 endedAt);
+    event Deposit(uint256 indexed tradeCycleId, uint256 amount);
     event CollateralSupplied(uint256 amount);
     event AssetBorrowed(uint256 amount);
     event DebtRepaid(uint256 amount);
     event CollateralWithdrawn(uint256 amount);
     event ContractFunded(uint256 amount);
     event ContractWithdrawn(uint256 amount);
+    event ClaimedRewards();
     event OperatorsSet(address[] operators, bool[] trusted);
     event BorrowPositionOpened(uint256 collateralAmount, uint256 borrowAmount);
 
@@ -30,8 +45,14 @@ interface IDiracHoneyPotV1 is IERC4626 {
     // Errors
     // ============================================
 
-    error Unauthorized();
+    error InsufficientFunds();
+    error OperationFailed();
+    error TradeNotMatured();
+    error UserExceedMaxDepositAmount();
+    error UserNotWhitelisted();
+    error ZeroAddress();
     error ZeroAmount();
+    error Unauthorized();
     error InsufficientBalance();
     error TransferFailed();
     error DebtExists();
@@ -200,6 +221,34 @@ interface IDiracHoneyPotV1 is IERC4626 {
      */
     function withdrawCollateralFromDolomite(uint256 _amount) external;
 
+    /**
+     * @notice Claims rewards from the underlying staking protocol
+     * @param _add Address of Dolomite IsolationModeUpgradeableProxy
+     */
+    function claimRewardsFromDolomite(address _add) external;
+
+    // ============================================
+    // Trade Cycle Control Functions
+    // ============================================
+
+    function initializeCycle() external;
+
+    function startTradeCycle(uint256 _duration) external;
+
+    function updateTradeCycleDuration(uint40 _newTradeCycleEndDate) external;
+
+    function requestToEndTradeCycle() external;
+
+    function endTradeCycle() external;
+
+    // ============================================
+    // Emergency Functions
+    // ============================================
+
+    function emergencyPause() external;
+
+    function emergencyUnpause() external;
+
     // ============================================
     // View Functions - Dolomite Positions
     // ============================================
@@ -310,6 +359,28 @@ interface IDiracHoneyPotV1 is IERC4626 {
      * @notice Deposit asset token
      */
     function assetDeposit() external view returns (IERC20);
+
+    /**
+     * @notice Max user deposit limit
+     */
+    function maxUserDeposit() external view returns (uint256);
+
+    /**
+     * @notice Whitelist status of users
+     */
+    function whitelisted(address user) external view returns (bool);
+
+    /**
+     * @notice Trade cycle information
+     */
+    function tradeCycles(
+        uint256 tradeCycleId
+    ) external view returns (Data.TradeCycle memory);
+
+    /**
+     * @notice Current trade cycle ID
+     */
+    function currentTradeCycleId() external view returns (uint256);
 
     // ============================================
     // Constants

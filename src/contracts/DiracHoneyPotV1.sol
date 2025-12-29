@@ -10,7 +10,10 @@ import {
     AccountBalanceLib,
     IBorrowPositionRouter,
     IDolomiteIsolationModeToken,
-    IsolationModeUpgradeableProxy
+    IsolationModeUpgradeableProxy,
+    IGenericTraderRouter,
+    IGenericTraderProxyV2,
+    IGenericTraderBase
 } from "../interfaces/IDolomite.sol";
 import {Data} from "../data/Data.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
@@ -436,6 +439,116 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
         emit Events.DebtRepaid(repayAmount);
         //emit BorrowPositionClosed(repayAmount);
+    }
+
+    /**
+     * @notice Repay debt by zapping collateral to debt asset
+     * @param zapAmountiBGT Amount of iBGT to zap (0 = zap all collateral)
+     * @param minUSDCOut Minimum USDC to receive from zap
+     * @param tradeData Encoded trade data for the zap (from aggregator API)
+     * @param traderAddress Address of the trader contract to use for zapping (e.g., Ooga Booga)
+     * @dev This zaps diBGT collateral in the borrow account to USDC and uses it to repay debt
+     * @dev Uses 2-step process: unwrap diBGT → iBGT, then swap iBGT → USDC
+     */
+    function repayDebtWithCollateral(
+        uint256 zapAmountiBGT,
+        uint256 minUSDCOut,
+        bytes calldata tradeData,
+        address traderAddress
+    )
+        external
+        nonReentrant
+        onlyRole(OPERATOR_ROLE)
+        onlyTradeCycle(Data.TradeCycleStatus.OPEN)
+        whenNotPaused
+    {
+        // Determine amount to zap
+        uint256 zapAmount = zapAmountiBGT;
+        if (zapAmount == 0) {
+            // Get collateral balance in borrow account (in diBGT)
+            (int256 collateralBalance, ) = getDebtAccountBalanceFromDolomite();
+            require(collateralBalance > 0, "No collateral to zap");
+            zapAmount = uint256(collateralBalance);
+        }
+
+        // Unwrapper trader address for diBGT
+        address unwrapperTrader = 0x34E08961BFF5FE27b44F814A470970dB6e90108A;
+
+        // Set up trader path: unwrap diBGT -> iBGT, then swap iBGT -> USDC
+        IGenericTraderBase.TraderParam[]
+            memory tradersPath = new IGenericTraderBase.TraderParam[](2);
+
+        // Unwrap diBGT to iBGT
+        tradersPath[0] = IGenericTraderBase.TraderParam({
+            traderType: IGenericTraderBase.TraderType.IsolationModeUnwrapper,
+            makerAccountIndex: 0,
+            trader: unwrapperTrader,
+            tradeData: bytes("")
+        });
+
+        //Swap iBGT to USDC via aggregator
+        tradersPath[1] = IGenericTraderBase.TraderParam({
+            traderType: IGenericTraderBase.TraderType.ExternalLiquidity,
+            makerAccountIndex: 0,
+            trader: traderAddress,
+            tradeData: tradeData
+        });
+
+        // Set up market IDs path: diBGT -> iBGT -> USDC
+        uint256[] memory marketIdsPath = new uint256[](3);
+        marketIdsPath[0] = DIBGT_MARKET_ID; // diBGT (isolation mode token)
+        marketIdsPath[1] = IBGT_MARKET_ID; // iBGT (actual token)
+        marketIdsPath[2] = USDC_MARKET_ID; // USDC
+
+        // Set up user config
+        IGenericTraderProxyV2.UserConfig
+            memory userConfig = IGenericTraderProxyV2.UserConfig({
+                deadline: block.timestamp,
+                balanceCheckFlag: AccountBalanceLib.BalanceCheckFlag.To,
+                eventType: IGenericTraderProxyV2.EventEmissionType.None
+            });
+
+        // Set up swap params
+        IGenericTraderProxyV2.SwapExactInputForOutputParams
+            memory params = IGenericTraderProxyV2
+                .SwapExactInputForOutputParams({
+                    accountNumber: BORROW_ACCOUNT,
+                    marketIdsPath: marketIdsPath,
+                    inputAmountWei: zapAmount,
+                    minOutputAmountWei: minUSDCOut,
+                    tradersPath: tradersPath,
+                    makerAccounts: new IDolomiteMargin.AccountInfo[](0),
+                    userConfig: userConfig
+                });
+
+        // Execute the zap
+        GENERIC_TRADER_ROUTER.swapExactInputForOutput(DIBGT_MARKET_ID, params);
+
+        // After zapping, check debt and transfer remaining collateral back
+        (
+            int256 remainingCollateral,
+            int256 remainingDebt
+        ) = getDebtAccountBalanceFromDolomite();
+
+        // If debt is paid off and there's remaining collateral, transfer it back
+        // In Dolomite, negative balance = debt, positive/zero = no debt
+        if (remainingDebt >= 0 && remainingCollateral > 0) {
+            BORROW_POSITION_ROUTER.transferBetweenAccounts(
+                DIBGT_MARKET_ID,
+                BORROW_ACCOUNT,
+                MAIN_ACCOUNT,
+                DIBGT_MARKET_ID,
+                uint256(remainingCollateral),
+                IBorrowPositionRouter.BalanceCheckFlag.None
+            );
+        }
+
+        // Reset tracking if fully paid
+        if (remainingDebt >= 0) {
+            totalAssetBorrowed = 0;
+        }
+
+        emit Events.DebtRepaid(zapAmount);
     }
 
     /**

@@ -12,7 +12,8 @@ import {
     IDolomiteMargin,
     IDepositWithdrawalRouter,
     AccountBalanceLib,
-    IBorrowPositionRouter
+    IBorrowPositionRouter,
+    IGenericTraderRouter
 } from "../interfaces/IDolomite.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
 
@@ -56,6 +57,8 @@ contract Controller is
     uint256 public constant BORROW_ACCOUNT = 123;
     /// @notice diBGT market ID
     uint256 public constant DIBGT_MARKET_ID = 38;
+    /// @notice iBGT market ID
+    uint256 public constant IBGT_MARKET_ID = 34;
     /// @notice USDC market ID
     uint256 public constant USDC_MARKET_ID = 2;
 
@@ -68,6 +71,9 @@ contract Controller is
     /// @notice Dolomite borrow position router
     IBorrowPositionRouter public constant BORROW_POSITION_ROUTER =
         IBorrowPositionRouter(0xF579b345cdA0860668b857De10ABD62442133D0F);
+    /// @notice Generic trader router
+    IGenericTraderRouter public constant GENERIC_TRADER_ROUTER =
+        IGenericTraderRouter(0x7b61CbA306CfdB02493b94757143132B1b72Bc6b);
     /// @notice Kodiak DEX router
     IKXRouter public constant KXRouter =
         IKXRouter(0x43Dac637c4383f91B4368041E7A8687da3806Cae);

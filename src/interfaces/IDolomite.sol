@@ -182,3 +182,101 @@ interface IsolationModeUpgradeableProxy {
      */
     function getReward() external;
 }
+
+interface IGenericTraderBase {
+    enum TraderType {
+        ExternalLiquidity,
+        InternalLiquidity,
+        IsolationModeUnwrapper,
+        IsolationModeWrapper
+    }
+
+    struct TraderParam {
+        TraderType traderType;
+        uint256 makerAccountIndex;
+        address trader;
+        bytes tradeData;
+    }
+}
+
+interface IGenericTraderProxyV2 {
+    enum EventEmissionType {
+        None,
+        BorrowPosition,
+        MarginPosition
+    }
+
+    struct TransferAmount {
+        uint256 marketId;
+        uint256 amountWei;
+    }
+
+    struct TransferCollateralParam {
+        uint256 fromAccountNumber;
+        uint256 toAccountNumber;
+        TransferAmount[] transferAmounts;
+    }
+
+    struct UserConfig {
+        uint256 deadline;
+        AccountBalanceLib.BalanceCheckFlag balanceCheckFlag;
+        EventEmissionType eventType;
+    }
+
+    struct ExpiryParam {
+        uint256 marketId;
+        uint32 expiryTimeDelta;
+    }
+
+    struct SwapExactInputForOutputParams {
+        uint256 accountNumber;
+        uint256[] marketIdsPath;
+        uint256 inputAmountWei;
+        uint256 minOutputAmountWei;
+        IGenericTraderBase.TraderParam[] tradersPath;
+        IDolomiteMargin.AccountInfo[] makerAccounts;
+        UserConfig userConfig;
+    }
+
+    struct SwapExactInputForOutputAndModifyPositionParams {
+        uint256 accountNumber;
+        uint256[] marketIdsPath;
+        uint256 inputAmountWei;
+        uint256 minOutputAmountWei;
+        IGenericTraderBase.TraderParam[] tradersPath;
+        IDolomiteMargin.AccountInfo[] makerAccounts;
+        TransferCollateralParam transferCollateralParams;
+        ExpiryParam expiryParams;
+        UserConfig userConfig;
+    }
+}
+
+interface IGenericTraderRouter {
+    /**
+     * @param _isolationModeMarketId Market ID of isolation mode token (0 if not using isolation mode)
+     * @param _params                Trading parameters including:
+     *                              - accountNumber: Account to trade from
+     *                              - marketIdsPath: Array of market IDs for trading path
+     *                              - inputAmountWei: Amount to swap (uint(-1) for entire balance)
+     *                              - minOutputAmountWei: Minimum output amount
+     *                              - tradersPath: Array of traders to use
+     *                              - makerAccounts: Accounts for internal liquidity trades
+     *                              - userConfig: Deadline, balance checks, and event config
+     */
+    function swapExactInputForOutput(
+        uint256 _isolationModeMarketId,
+        IGenericTraderProxyV2.SwapExactInputForOutputParams memory _params
+    ) external;
+
+    /**
+     * @param _isolationModeMarketId Market ID of isolation mode token (0 if not using isolation mode)
+     * @param _params                Trading parameters including:
+     *                              - All parameters from SwapExactInputForOutputParams
+     *                              - transferCollateralParams: Collateral transfer config
+     *                              - expiryParams: Position expiry settings
+     */
+    function swapExactInputForOutputAndModifyPosition(
+        uint256 _isolationModeMarketId,
+        IGenericTraderProxyV2.SwapExactInputForOutputAndModifyPositionParams memory _params
+    ) external;
+}
