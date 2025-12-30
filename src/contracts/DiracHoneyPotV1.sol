@@ -387,7 +387,8 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
      * @dev After this, collateral will be back in account 0 (still in Dolomite)
      */
     function repayDebtToDolomite(
-        uint256 _amount
+        uint256 _amount,
+        address _add
     )
         external
         nonReentrant
@@ -424,15 +425,16 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
             AccountBalanceLib.BalanceCheckFlag.From
         );
 
-        // Transfer collateral back to main account
-        BORROW_POSITION_ROUTER.transferBetweenAccounts(
-            DIBGT_MARKET_ID,
-            BORROW_ACCOUNT,
-            MAIN_ACCOUNT,
-            DIBGT_MARKET_ID,
-            totalCollateralDeposited,
-            IBorrowPositionRouter.BalanceCheckFlag.None
-        );
+        IsolationModeUpgradeableProxy(_add).closeBorrowPositionWithUnderlyingVaultToken(BORROW_ACCOUNT,MAIN_ACCOUNT);
+        // // Transfer collateral back to main account
+        // BORROW_POSITION_ROUTER.transferBetweenAccounts(
+        //     DIBGT_MARKET_ID,
+        //     BORROW_ACCOUNT,
+        //     MAIN_ACCOUNT,
+        //     DIBGT_MARKET_ID,
+        //     totalCollateralDeposited,
+        //     IBorrowPositionRouter.BalanceCheckFlag.None
+        // );
 
         // Reset debt tracking
         totalAssetBorrowed = 0;

@@ -210,8 +210,9 @@ interface IDiracHoneyPotV1 is IERC4626 {
      * @notice Repay USDC debt and close borrow position
      * @dev Only callable by OPERATOR_ROLE during OPEN trade cycle
      * @param _amount Amount to repay (0 = auto-calculate with 10% buffer)
+     * @param _add Address of Dolomite IsolationModeUpgradeableProxy
      */
-    function repayDebtToDolomite(uint256 _amount) external;
+    function repayDebtToDolomite(uint256 _amount, address _add) external;
 
     /**
      * @notice Withdraw iBGT from Dolomite

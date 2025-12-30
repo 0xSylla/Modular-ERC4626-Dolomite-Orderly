@@ -181,6 +181,16 @@ interface IsolationModeUpgradeableProxy {
      * @dev This is the standard getReward function used by many reward vaults
      */
     function getReward() external;
+
+    /**
+     * @notice  End-user function for closing a borrow position involving the vault factory's underlying token. Should
+     *          only be executable by the vault owner. Reverts if `_borrowAccountNumber` is 0 or if `_toAccountNumber`
+     *          is not 0.
+     */
+    function closeBorrowPositionWithUnderlyingVaultToken(
+        uint256 _borrowAccountNumber,
+        uint256 _toAccountNumber
+    ) external;
 }
 
 interface IGenericTraderBase {
