@@ -290,3 +290,15 @@ interface IGenericTraderRouter {
         IGenericTraderProxyV2.SwapExactInputForOutputAndModifyPositionParams memory _params
     ) external;
 }
+
+interface IOogaBoogaRouter {
+    /// @dev Contains all information needed to describe the input and output for a swap
+    struct swapTokenInfo {
+        address inputToken;
+        uint256 inputAmount;
+        address outputToken;
+        uint256 outputQuote;
+        uint256 outputMin;
+        address outputReceiver;
+    }
+}

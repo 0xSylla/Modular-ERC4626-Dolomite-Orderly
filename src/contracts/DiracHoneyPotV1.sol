@@ -13,7 +13,8 @@ import {
     IsolationModeUpgradeableProxy,
     IGenericTraderRouter,
     IGenericTraderProxyV2,
-    IGenericTraderBase
+    IGenericTraderBase,
+    IOogaBoogaRouter
 } from "../interfaces/IDolomite.sol";
 import {Data} from "../data/Data.sol";
 import {IKXRouter} from "../interfaces/IKXRouter.sol";
@@ -405,7 +406,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
         if (repayAmount == 0) revert Events.ZeroAmount();
 
-        // Approve and deposit USDC to account 0
+        // Approve and deposit USDC to main account in order to repay the debt
         borrowAsset.approve(address(DEPOSIT_WITHDRAWAL_ROUTER), repayAmount);
 
         DEPOSIT_WITHDRAWAL_ROUTER.depositWei(
@@ -425,38 +426,31 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
             AccountBalanceLib.BalanceCheckFlag.From
         );
 
-        IsolationModeUpgradeableProxy(_add).closeBorrowPositionWithUnderlyingVaultToken(BORROW_ACCOUNT,MAIN_ACCOUNT);
-        // // Transfer collateral back to main account
-        // BORROW_POSITION_ROUTER.transferBetweenAccounts(
-        //     DIBGT_MARKET_ID,
-        //     BORROW_ACCOUNT,
-        //     MAIN_ACCOUNT,
-        //     DIBGT_MARKET_ID,
-        //     totalCollateralDeposited,
-        //     IBorrowPositionRouter.BalanceCheckFlag.None
-        // );
+        //Close Borrow position and send back collateral to main account
+        IsolationModeUpgradeableProxy(_add)
+            .closeBorrowPositionWithUnderlyingVaultToken(
+                BORROW_ACCOUNT,
+                MAIN_ACCOUNT
+            );
 
         // Reset debt tracking
         totalAssetBorrowed = 0;
 
         emit Events.DebtRepaid(repayAmount);
-        //emit BorrowPositionClosed(repayAmount);
     }
 
     /**
      * @notice Repay debt by zapping collateral to debt asset
-     * @param zapAmountiBGT Amount of iBGT to zap (0 = zap all collateral)
      * @param minUSDCOut Minimum USDC to receive from zap
-     * @param tradeData Encoded trade data for the zap (from aggregator API)
-     * @param traderAddress Address of the trader contract to use for zapping (e.g., Ooga Booga)
+     * @param expectedUSDCOut Quote USDC to receive from zap
+     * @param pathDefinition Encoded swap route data for the zap (from aggregator API)
      * @dev This zaps diBGT collateral in the borrow account to USDC and uses it to repay debt
      * @dev Uses 2-step process: unwrap diBGT → iBGT, then swap iBGT → USDC
      */
-    function repayDebtWithCollateral(
-        uint256 zapAmountiBGT,
+    function repayDebtWithCollateralAsset(
         uint256 minUSDCOut,
-        bytes calldata tradeData,
-        address traderAddress
+        uint256 expectedUSDCOut,
+        bytes calldata pathDefinition
     )
         external
         nonReentrant
@@ -464,53 +458,63 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         onlyTradeCycle(Data.TradeCycleStatus.OPEN)
         whenNotPaused
     {
-        // Determine amount to zap
-        uint256 zapAmount = zapAmountiBGT;
-        if (zapAmount == 0) {
-            // Get collateral balance in borrow account (in diBGT)
-            (int256 collateralBalance, ) = getDebtAccountBalanceFromDolomite();
-            if (collateralBalance < 0) revert Events.NoCollateralToZap();
-            zapAmount = uint256(collateralBalance);
-        }
+        // Get collateral amount
+        (int256 collateralBalance, ) = getDebtAccountBalanceFromDolomite();
+        if (collateralBalance <= 0) revert Events.NoCollateralToZap();
+        uint256 zapAmount = uint256(collateralBalance);
 
-        // Unwrapper trader address for diBGT
-        address unwrapperTrader = 0x34E08961BFF5FE27b44F814A470970dB6e90108A;
-
-        // Set up trader path: unwrap diBGT -> iBGT, then swap iBGT -> USDC
+        // Setup 2 traders for GenericTraderRouter: unwrap diBGT → iBGT, then swap iBGT → USDC
         IGenericTraderBase.TraderParam[]
             memory tradersPath = new IGenericTraderBase.TraderParam[](2);
 
-        // Unwrap diBGT to iBGT
+        // Trader 1: Unwrap diBGT → iBGT
         tradersPath[0] = IGenericTraderBase.TraderParam({
             traderType: IGenericTraderBase.TraderType.IsolationModeUnwrapper,
             makerAccountIndex: 0,
-            trader: unwrapperTrader,
+            trader: DIBGT_UNWRAPPER_TRADER,
             tradeData: bytes("")
         });
 
-        //Swap iBGT to USDC via aggregator
+        // Trader 2: Swap iBGT → USDC (via Dolomite's Ooga Booga adapter)
+        IOogaBoogaRouter.swapTokenInfo memory tokenInfo = IOogaBoogaRouter
+            .swapTokenInfo({
+                inputToken: address(collateralAsset),
+                inputAmount: zapAmount,
+                outputToken: address(borrowAsset),
+                outputQuote: expectedUSDCOut,
+                outputMin: minUSDCOut,
+                outputReceiver: DOLOMITE_OOGA_ADAPTER
+            });
+
+        bytes memory orderData = abi.encode(
+            tokenInfo,
+            pathDefinition,
+            OOGABOOGA_EXECUTOR,
+            2
+        );
+
         tradersPath[1] = IGenericTraderBase.TraderParam({
             traderType: IGenericTraderBase.TraderType.ExternalLiquidity,
             makerAccountIndex: 0,
-            trader: traderAddress,
-            tradeData: tradeData
+            trader: DOLOMITE_OOGA_ADAPTER,
+            tradeData: orderData
         });
 
-        // Set up market IDs path: diBGT -> iBGT -> USDC
+        // Market path: diBGT → iBGT → USDC
         uint256[] memory marketIdsPath = new uint256[](3);
-        marketIdsPath[0] = DIBGT_MARKET_ID; // diBGT (isolation mode token)
-        marketIdsPath[1] = IBGT_MARKET_ID; // iBGT (actual token)
-        marketIdsPath[2] = USDC_MARKET_ID; // USDC
+        marketIdsPath[0] = DIBGT_MARKET_ID;
+        marketIdsPath[1] = IBGT_MARKET_ID;
+        marketIdsPath[2] = USDC_MARKET_ID;
 
-        // Set up user config
+        // User config
         IGenericTraderProxyV2.UserConfig
             memory userConfig = IGenericTraderProxyV2.UserConfig({
-                deadline: block.timestamp,
-                balanceCheckFlag: AccountBalanceLib.BalanceCheckFlag.To,
+                deadline: block.timestamp + 300,
+                balanceCheckFlag: AccountBalanceLib.BalanceCheckFlag.Both,
                 eventType: IGenericTraderProxyV2.EventEmissionType.None
             });
 
-        // Set up swap params
+        // Swap params
         IGenericTraderProxyV2.SwapExactInputForOutputParams
             memory params = IGenericTraderProxyV2
                 .SwapExactInputForOutputParams({
@@ -526,31 +530,35 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         // Execute the zap
         GENERIC_TRADER_ROUTER.swapExactInputForOutput(DIBGT_MARKET_ID, params);
 
-        // After zapping, check debt and transfer remaining collateral back
-        (
-            int256 remainingCollateral,
-            int256 remainingDebt
-        ) = getDebtAccountBalanceFromDolomite();
-
-        // If debt is paid off and there's remaining collateral, transfer it back
-        // In Dolomite, negative balance = debt, positive/zero = no debt
-        if (remainingDebt >= 0 && remainingCollateral > 0) {
-            BORROW_POSITION_ROUTER.transferBetweenAccounts(
-                DIBGT_MARKET_ID,
-                BORROW_ACCOUNT,
-                MAIN_ACCOUNT,
-                DIBGT_MARKET_ID,
-                uint256(remainingCollateral),
-                IBorrowPositionRouter.BalanceCheckFlag.None
-            );
-        }
+        // Handle remaining collateral
+        //After the zap, the remaining collateral is now in borrowAsset
+        (, int256 remainingCollateral) = getDebtAccountBalanceFromDolomite();
 
         // Reset tracking if fully paid
-        if (remainingDebt >= 0) {
+        if (remainingCollateral >= 0) {
             totalAssetBorrowed = 0;
+            totalCollateralDeposited = 0;
         }
 
-        emit Events.DebtRepaid(zapAmount);
+        //Transfer remainingCollateral to vault
+        BORROW_POSITION_ROUTER.transferBetweenAccounts(
+            DIBGT_MARKET_ID,
+            BORROW_ACCOUNT,
+            MAIN_ACCOUNT,
+            USDC_MARKET_ID,
+            uint256(remainingCollateral),
+            IBorrowPositionRouter.BalanceCheckFlag.None
+        );
+
+        DEPOSIT_WITHDRAWAL_ROUTER.withdrawWei(
+            0,
+            MAIN_ACCOUNT,
+            USDC_MARKET_ID,
+            uint256(remainingCollateral),
+            IDepositWithdrawalRouter.EventFlag.None
+        );
+
+        emit Events.DebtRepaidWithCollateralAsset(uint256(remainingCollateral));
     }
 
     /**

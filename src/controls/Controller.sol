@@ -61,6 +61,14 @@ contract Controller is
     uint256 public constant IBGT_MARKET_ID = 34;
     /// @notice USDC market ID
     uint256 public constant USDC_MARKET_ID = 2;
+    /// @notice Dolomite OogaBooga adapter
+    address public constant DOLOMITE_OOGA_ADAPTER =
+        0x0CE205f7bCBa70E4c03f826918c8c21073386ED3;
+    /// @notice OogaBooga executor
+    address public constant OOGABOOGA_EXECUTOR =
+        0x27F66bA3fDa600239F48526Bb26A1F8D5700ccf7;
+    address public constant DIBGT_UNWRAPPER_TRADER =
+        0x34E08961BFF5FE27b44F814A470970dB6e90108A;
 
     /// @notice Dolomite main contract
     IDolomiteMargin public constant DOLOMITE_MARGIN =
@@ -71,7 +79,7 @@ contract Controller is
     /// @notice Dolomite borrow position router
     IBorrowPositionRouter public constant BORROW_POSITION_ROUTER =
         IBorrowPositionRouter(0xF579b345cdA0860668b857De10ABD62442133D0F);
-    /// @notice Generic trader router
+    /// @notice Dolomite Generic trader router
     IGenericTraderRouter public constant GENERIC_TRADER_ROUTER =
         IGenericTraderRouter(0x7b61CbA306CfdB02493b94757143132B1b72Bc6b);
     /// @notice Kodiak DEX router

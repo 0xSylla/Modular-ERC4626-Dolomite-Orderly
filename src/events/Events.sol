@@ -28,6 +28,7 @@ library Events {
     event ClaimedRewards();
     event OperatorsSet(address[] operators, bool[] trusted);
     event BorrowPositionOpened(uint256 collateralAmount, uint256 borrowAmount);
+    event DebtRepaidWithCollateralAsset(uint256 remainingCollateral);
 
     // Errors
     error InsufficientFunds();
