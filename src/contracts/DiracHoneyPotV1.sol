@@ -351,6 +351,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
         // Open borrow position and transfer collateral from vault account to borrow account
         BORROW_POSITION_ROUTER.openBorrowPosition(
+            DIBGT_MARKET_ID, // isolationModeIds
             MAIN_ACCOUNT, // fromAccountNumber
             BORROW_ACCOUNT, // toAccountNumber
             DIBGT_MARKET_ID, // collteralMarketId
@@ -400,8 +401,8 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         uint256 repayAmount = _amount;
 
         if (repayAmount == 0) {
-            // Add 10% buffer for accrued interest
-            repayAmount = (totalAssetBorrowed * 110) / 100;
+            // Add 1% buffer for accrued interest
+            repayAmount = (totalAssetBorrowed * 101) / 100;
         }
 
         if (repayAmount == 0) revert Events.ZeroAmount();
@@ -435,6 +436,8 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
 
         // Reset debt tracking
         totalAssetBorrowed = 0;
+
+        _withdrawCollateralFromDolomite(0);
 
         emit Events.DebtRepaid(repayAmount);
     }
@@ -575,6 +578,38 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         onlyTradeCycle(Data.TradeCycleStatus.OPEN)
         whenNotPaused
     {
+        if (totalAssetBorrowed > 0) revert Events.DebtExists();
+
+        uint256 withdrawAmount = _amount;
+
+        // If amount is 0, withdraw all
+        if (withdrawAmount == 0) {
+            withdrawAmount = totalCollateralDeposited;
+        }
+
+        if (withdrawAmount == 0) revert Events.ZeroAmount();
+        if (withdrawAmount > totalCollateralDeposited)
+            revert Events.InsufficientBalance();
+
+        // Withdraw iBGT from Dolomite
+        DEPOSIT_WITHDRAWAL_ROUTER.withdrawWei(
+            DIBGT_MARKET_ID,
+            MAIN_ACCOUNT,
+            DIBGT_MARKET_ID,
+            withdrawAmount,
+            IDepositWithdrawalRouter.EventFlag.None
+        );
+
+        totalCollateralDeposited -= withdrawAmount;
+
+        emit Events.CollateralWithdrawn(withdrawAmount);
+    }
+    /**
+     * @notice Internal function to withdraw iBGT from  after repaying
+     * @param _amount Amount of iBGT to withdraw (0 = withdraw all)
+     * @dev Requires all debt to be repaid first
+     */
+    function _withdrawCollateralFromDolomite(uint256 _amount) internal {
         if (totalAssetBorrowed > 0) revert Events.DebtExists();
 
         uint256 withdrawAmount = _amount;

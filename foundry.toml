@@ -19,5 +19,6 @@ arbitrum = { key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api", c
 arbitrum_sepolia = { key = "${ARBISCAN_API_KEY}", url = "https://api.arbiscan.io/api", chain = 421614 }
 [rpc_endpoints]
 mainnet = "https://rpc.berachain.com/"
+bartio = "https://bartio.rpc.berachain.com/"
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

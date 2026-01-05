@@ -62,6 +62,10 @@ interface IDolomiteMargin {
         uint256 marketId
     ) external view returns (Wei memory);
 
+    function getAccountMarketsWithBalances(
+        AccountInfo calldata account
+    ) external view returns (uint256[] memory);
+
     function setOperators(OperatorArg[] calldata args) external;
 
     function operate(
@@ -123,6 +127,7 @@ interface IBorrowPositionRouter {
     ) external view returns (int256);
 
     function openBorrowPosition(
+        uint256 _isolationModeMarketId,
         uint256 _fromAccountNumber,
         uint256 _toAccountNumber,
         uint256 _marketId,
@@ -191,6 +196,17 @@ interface IsolationModeUpgradeableProxy {
         uint256 _borrowAccountNumber,
         uint256 _toAccountNumber
     ) external;
+
+    function swapExactInputForOutputAndRemoveCollateral(
+        uint256 _toAccountNumber,
+        uint256 _borrowAccountNumber,
+        uint256[] calldata _marketIdsPath,
+        uint256 _inputAmountWei,
+        uint256 _minOutputAmountWei,
+        IGenericTraderBase.TraderParam[] calldata _tradersPath,
+        IDolomiteMargin.AccountInfo[] calldata _makerAccounts,
+        IGenericTraderProxyV2.UserConfig calldata _userConfig
+    ) external payable;
 }
 
 interface IGenericTraderBase {
