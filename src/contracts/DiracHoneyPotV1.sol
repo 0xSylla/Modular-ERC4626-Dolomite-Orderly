@@ -4,6 +4,7 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts-upgradeable/token/ERC20/extensions/ERC4626Upgradeable.sol";
 import {Controller} from "../controls/Controller.sol";
 import {IVault, VaultTypes} from "../interfaces/IOrderly.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {
     IDolomiteMargin,
     IDepositWithdrawalRouter,
@@ -24,6 +25,8 @@ import {
 } from "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
 contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
+    using SafeERC20 for IERC20;
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -246,9 +249,11 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
             receiver: address(this)
         });
 
-        TransferHelper.safeApprove(tokenIn, _spender, amountIn);
+        TransferHelper.safeApprove(tokenIn, address(KXRouter), amountIn);
 
         KXRouter.swap(input, output, swapDatas, feeDatas);
+
+        TransferHelper.safeApprove(tokenIn, address(KXRouter), 0);
     }
     ////////////////////////////////////////////////////////////////////////////
     //////////////////////// ORDERLY FUNCTIONS /////////////////////////////////
@@ -275,7 +280,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         VaultTypes.VaultDepositFE calldata data,
         uint256 fee
     ) external nonReentrant onlyRole(OPERATOR_ROLE) whenNotPaused {
-        IERC20(assetDeposit).approve(ivault, data.tokenAmount);
+        IERC20(assetDeposit).safeIncreaseAllowance(ivault, data.tokenAmount);
         IVault(ivault).deposit{value: fee}(data);
     }
 
@@ -318,7 +323,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         if (_amount > contractBalance) revert Events.InsufficientBalance();
 
         // Approve Dolomite router
-        collateralAsset.approve(address(DEPOSIT_WITHDRAWAL_ROUTER), _amount);
+        collateralAsset.safeIncreaseAllowance(address(DEPOSIT_WITHDRAWAL_ROUTER), _amount);
 
         // Deposit to Dolomite account 0
         DEPOSIT_WITHDRAWAL_ROUTER.depositWei(
@@ -389,8 +394,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
      * @dev After this, collateral will be back in account 0 (still in Dolomite)
      */
     function repayDebtToDolomite(
-        uint256 _amount,
-        address _add
+        uint256 _amount
     )
         external
         nonReentrant
@@ -398,6 +402,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         onlyTradeCycle(Data.TradeCycleStatus.OPEN)
         whenNotPaused
     {
+        if (dolomiteIsolationProxy == address(0)) revert Events.ZeroAddress();
         uint256 repayAmount = _amount;
 
         if (repayAmount == 0) {
@@ -408,7 +413,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         if (repayAmount == 0) revert Events.ZeroAmount();
 
         // Approve and deposit USDC to main account in order to repay the debt
-        borrowAsset.approve(address(DEPOSIT_WITHDRAWAL_ROUTER), repayAmount);
+        borrowAsset.safeIncreaseAllowance(address(DEPOSIT_WITHDRAWAL_ROUTER), repayAmount);
 
         DEPOSIT_WITHDRAWAL_ROUTER.depositWei(
             0,
@@ -428,7 +433,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         );
 
         //Close Borrow position and send back collateral to main account
-        IsolationModeUpgradeableProxy(_add)
+        IsolationModeUpgradeableProxy(dolomiteIsolationProxy)
             .closeBorrowPositionWithUnderlyingVaultToken(
                 BORROW_ACCOUNT,
                 MAIN_ACCOUNT
@@ -638,21 +643,26 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
     }
     /**
      * @notice Claims rewards from the underlying staking protocol
-     * @param _add Address of Dolomite IsolationModeUpgradeableProxy
      * @dev This is the standard getReward function used by many reward vaults
      */
-    function claimRewardsFromDolomite(
-        address _add
-    )
+    function claimRewardsFromDolomite()
         external
         onlyRole(OPERATOR_ROLE)
         whenNotPaused
         nonReentrant
         onlyTradeCycle(Data.TradeCycleStatus.OPEN)
     {
-        if (_add == address(0)) revert Events.ZeroAddress();
-        IsolationModeUpgradeableProxy(_add).getReward();
+        if (dolomiteIsolationProxy == address(0)) revert Events.ZeroAddress();
+        IsolationModeUpgradeableProxy(dolomiteIsolationProxy).getReward();
         emit Events.ClaimedRewards();
+    }
+
+    ////////////////////////////////////////////////////////////////////////////
+    /////////////////////////// SETTERS FUNCTIONS //////////////////////////////
+    ////////////////////////////////////////////////////////////////////////////
+    function setDolomiteIsolationProxy(address _proxy) external onlyRole(DEFAULT_ADMIN_ROLE) { 
+        if (_proxy == address(0)) revert Events.ZeroAddress();
+        dolomiteIsolationProxy = _proxy;
     }
     ////////////////////////////////////////////////////////////////////////////
     /////////////////////////// VIEW FUNCTIONS /////////////////////////////////

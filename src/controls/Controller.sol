@@ -49,6 +49,8 @@ contract Controller is
     uint256 public totalCollateralDeposited;
     /// @notice Total USDC borrowed from Dolomite
     uint256 public totalAssetBorrowed;
+    /// @notice Dolomite Isolation vault proxy address
+    address public dolomiteIsolationProxy;
 
     // ============ Dolomite Constants ============
     /// @notice Main vault account
