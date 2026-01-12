@@ -233,8 +233,7 @@ contract DiracHoneyPotV1 is Controller, ERC4626Upgradeable {
         bool unwrapOut,
         uint256 minAmountOut,
         IKXRouter.SwapData calldata swapDatas,
-        IKXRouter.FeeData calldata feeDatas,
-        address _spender
+        IKXRouter.FeeData calldata feeDatas
     ) external nonReentrant onlyRole(OPERATOR_ROLE) {
         IKXRouter.InputAmount memory input = IKXRouter.InputAmount({
             token: tokenIn,
