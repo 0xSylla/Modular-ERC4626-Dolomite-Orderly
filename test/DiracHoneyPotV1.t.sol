@@ -763,8 +763,7 @@ contract DiracHoneyPotV1Test is Test {
             false,
             900 ether,
             swapData,
-            feeData,
-            KODIAK_ROUTER
+            feeData
         );
     }
 

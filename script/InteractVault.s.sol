@@ -65,8 +65,7 @@ contract InteractVault is Script {
             unwrapOut,
             minAmountOut,
             swapDatas,
-            feeDatas,
-            _spender
+            feeDatas
         );
         vm.stopBroadcast();
         console.log("Kodiak swap executed.");
@@ -109,8 +108,7 @@ contract InteractVault is Script {
             unwrapOut,
             minAmountOut,
             swapData,
-            feeData,
-            spender
+            feeData
         );
         vm.stopBroadcast();
         console.log("Kodiak swap executed from script values.");
