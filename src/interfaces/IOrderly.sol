@@ -60,4 +60,5 @@ interface IVault {
     function delegateSigner(VaultTypes.VaultDelegate calldata data) external;
     function deposit(VaultTypes.VaultDepositFE calldata data) external payable;
     function withdraw2Contract(VaultTypes.VaultWithdraw2Contract calldata data) external;
+    function getDepositFee(address sender, VaultTypes.VaultDepositFE calldata data) external view returns (uint256);
 }

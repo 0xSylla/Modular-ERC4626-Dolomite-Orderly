@@ -1,0 +1,42 @@
+﻿Workflow Dirac modular vault
+
+
+Curator Workflow:
+Phase1
+From the frontend, the curator (anyone, permissionless) deploys a vault through the vaultFactory contract by specifyng the vault name, the user deposit token(pre-approved stablecoins) the fee structure and the max deposit for the vault. On every vault deployed, the factory contract(multisig controlled) has the OWNER_ROLE(for emergency action), the curator has the CURATOR_ROLE (cycle management, launch/close strategy), and there is an OPERATOR_ROLE(for the automation scripts to execute positions for example).
+
+
+Phase2
+After vault is deployed the curator trough the VaultCuratorRouter contract:
+-defines the trade cycle structure(deposit window, trading cycle, withdraw window).
+-defines one or more strategy. The stategy is the full process(swap user déposits to X token => supply X token to Y lending protocol => borrow 50% back in stables to short with x2 leverage on Z perps protocol). The curator first whitelist for the vault (from pre-approved tokens too) target assets for the strategies. The Target asset(Token X) is the asset on which a strategy will be executed (e.g. iBGT, WBTC, ETH).
+
+
+Each strategy specifies:
+* Target asset - From the asset whitelisted by the curator for this vault earlier
+* Capital allocation — the percentage of the vault's idle funds (uninvested USDC) to deploy into this position. For example, 80% means 80% of         available USDC will be swapped into the target asset and put to work when the strategy is launched
+* Rebalance threshold — the percentage price move in the target asset that triggers a full rebalance.
+* The protocol to use for each leg (for example for swapping he can choose kodiak or ooga booga, same for the lending and perps legs).
+The curator can define multiple positions within a single vault, each targeting a different asset with its own allocation percentage and rebalance threshold.
+
+
+Phase 3 
+After all these configurations, the curator can executes/rebalances(allowed to bypass the treshold)/closes a strategy through single call on the VaultCuratorRouter contract:
+-launchStrategy(stratID)
+-RebalanceStrategy(stratID)
+-CloseStrategy(stratID)
+
+
+Dirac:
+Dirac is responsible for the protocol-level setup and governance. Before any curator can deploy a vault, Dirac:
+
+
+* Deploys the factory contract — the central registry through which all vaults are created and protocol-level configuration is managed.
+* Deploys and registers strategy module contracts on the factory — each module encapsulates the logic for one type of protocol interaction: swapping (e.g. Kodiak, Ooga Booga), lending/borrowing (e.g. Dolomite), and perpetuals (e.g. Orderly). Modules are stateless and shared across all vaults.
+* Whitelists assets available for strategy execution — each whitelisted asset is registered as a struct rather than a simple address, because the same asset may have a different identifier depending on the protocol. For example, iBGT may be referenced by its ERC-20 address on Dolomite but by a market symbol or ID on Orderly. The struct holds all protocol-specific identifiers for a given asset in one place.
+* Whitelists accepted deposit tokens — defines which tokens investors can use to deposit into vaults (e.g. USDC). Curators can only select from this list when deploying a vault.
+* Retains emergency powers over individual vaults via the factory contract — Dirac can intervene on any vault in case of critical failure, including forcing a cycle to close or pausing vault operations, without requiring curator cooperation.
+
+
+Users:
+Deposit/Withdraw using Router

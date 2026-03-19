@@ -5,7 +5,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC4626} from "@openzeppelin/contracts/interfaces/IERC4626.sol";
 import {IVault, VaultTypes} from "./IOrderly.sol";
 import {IKXRouter} from "./IKXRouter.sol";
-import {Data} from "../data/Data.sol";
+import {Data} from "../libraries/Data.sol";
 
 /**
  * @title IDiracHoneyPotV1

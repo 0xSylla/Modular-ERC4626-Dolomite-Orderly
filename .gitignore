@@ -12,6 +12,8 @@ docs/
 
 # Dotenv file
 .env
+.env.local
+.env*.local
 commands.txt
 contractInfos.txt
 infos.txt
@@ -19,3 +21,14 @@ lib
 /broadcast/*/31337/
 /broadcast/**/dry-run/
 !script/
+
+# Claude Code memory
+.claude/
+
+# Frontend
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+
+# API
+api/node_modules/

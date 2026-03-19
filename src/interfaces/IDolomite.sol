@@ -174,6 +174,45 @@ interface IBorrowPositionRouter {
     ) external;
 }
 
+/// @dev BorrowPositionRouter interface for regular (non-isolation-mode) markets.
+///      openBorrowPosition has 5 params — no _isolationModeMarketId prefix.
+///      This matches the on-chain selector 0xbb0a6fa5 used on Arbitrum.
+interface IArbitrumBorrowPositionRouter {
+    enum BalanceCheckFlag { Both, From, To, None }
+
+    function openBorrowPosition(
+        uint256 _fromAccountNumber,
+        uint256 _toAccountNumber,
+        uint256 _marketId,
+        uint256 _amount,
+        BalanceCheckFlag _balanceCheckFlag
+    ) external;
+
+    function transferBetweenAccounts(
+        uint256 _isolationModeMarketId,
+        uint256 _fromAccountNumber,
+        uint256 _toAccountNumber,
+        uint256 _marketId,
+        uint256 _amount,
+        BalanceCheckFlag _balanceCheckFlag
+    ) external;
+
+    function repayAllForBorrowPosition(
+        uint256 _isolationModeMarketId,
+        uint256 _fromAccountNumber,
+        uint256 _borrowAccountNumber,
+        uint256 _marketId,
+        AccountBalanceLib.BalanceCheckFlag _balanceCheckFlag
+    ) external;
+
+    function closeBorrowPosition(
+        uint256 _isolationModeMarketId,
+        uint256 _borrowAccountNumber,
+        uint256 _toAccountNumber,
+        uint256[] calldata _collateralMarketIds
+    ) external;
+}
+
 interface IDolomiteIsolationModeToken {
     function getVaultByAccount(
         address _account
