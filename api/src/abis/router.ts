@@ -124,4 +124,21 @@ export const routerAbi = [
     outputs: [{ name: "results", type: "bytes[]" }],
     stateMutability: "payable",
   },
+  {
+    type: "function",
+    name: "nextPositionId",
+    inputs: [{ name: "vault", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "requestRebalance",
+    inputs: [
+      { name: "vault", type: "address" },
+      { name: "positionId", type: "uint256" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
 ] as const;

@@ -3,6 +3,8 @@ import cors from "cors";
 import { config, getApiKey } from "./config";
 import { positionsRouter } from "./routes/positions";
 import { vaultsRouter } from "./routes/vaults";
+import { monitorRouter } from "./routes/monitor";
+import { stopMonitor } from "./services/rebalance-monitor";
 import { operatorAddress } from "./services/blockchain";
 import { cleanupStaleJobs } from "./services/jobs";
 
@@ -45,6 +47,7 @@ app.get("/health", (_req, res) => {
 // Routes
 app.use("/vaults", vaultsRouter);
 app.use("/positions", positionsRouter);
+app.use("/monitor", monitorRouter);
 
 // Job cleanup interval (every 10 minutes)
 const cleanupInterval = setInterval(() => {
@@ -60,6 +63,7 @@ const server = app.listen(config.port, () => {
 
 function shutdown() {
   console.log("Shutting down...");
+  stopMonitor();
   clearInterval(cleanupInterval);
   server.close(() => process.exit(0));
   // Force exit after 10s if connections don't close

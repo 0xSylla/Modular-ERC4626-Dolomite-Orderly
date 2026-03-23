@@ -52,6 +52,12 @@ export default function RootLayout({
                     Deploy
                   </Link>
                   <Link
+                    href="/deploy-v2"
+                    className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                  >
+                    Deploy v2
+                  </Link>
+                  <Link
                     href="/admin"
                     className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                   >
