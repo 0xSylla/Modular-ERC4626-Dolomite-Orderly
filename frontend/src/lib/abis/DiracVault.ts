@@ -1,0 +1,588 @@
+export const vaultAbi = [
+  // === Role constants ===
+  {
+    type: "function",
+    name: "CURATOR_ROLE",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "DEFAULT_ADMIN_ROLE",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "OPERATOR_ROLE",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "OWNER_ROLE",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+
+  // === ERC20 ===
+  {
+    type: "function",
+    name: "allowance",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "approve",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "decimals",
+    inputs: [],
+    outputs: [{ name: "", type: "uint8" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "name",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "symbol",
+    inputs: [],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "totalSupply",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "transfer",
+    inputs: [
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "transferFrom",
+    inputs: [
+      { name: "from", type: "address" },
+      { name: "to", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "nonpayable",
+  },
+
+  // === ERC4626 ===
+  {
+    type: "function",
+    name: "asset",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToAssets",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "convertToShares",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "deposit",
+    inputs: [
+      { name: "assets", type: "uint256" },
+      { name: "receiver", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "maxDeposit",
+    inputs: [{ name: "receiver", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "maxMint",
+    inputs: [{ name: "receiver", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "maxRedeem",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "maxWithdraw",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "mint",
+    inputs: [
+      { name: "shares", type: "uint256" },
+      { name: "receiver", type: "address" },
+    ],
+    outputs: [{ name: "assets", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "previewDeposit",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewMint",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewRedeem",
+    inputs: [{ name: "shares", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "previewWithdraw",
+    inputs: [{ name: "assets", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "redeem",
+    inputs: [
+      { name: "shares", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "assets", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "totalAssets",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "withdraw",
+    inputs: [
+      { name: "assets", type: "uint256" },
+      { name: "receiver", type: "address" },
+      { name: "owner", type: "address" },
+    ],
+    outputs: [{ name: "shares", type: "uint256" }],
+    stateMutability: "nonpayable",
+  },
+
+  // === Vault-specific functions ===
+  {
+    type: "function",
+    name: "closeCycle",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "emergencyEndCycle",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "emergencyExecuteModule",
+    inputs: [
+      { name: "module", type: "address" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "executeBatch",
+    inputs: [
+      { name: "modules", type: "address[]" },
+      { name: "datas", type: "bytes[]" },
+    ],
+    outputs: [{ name: "results", type: "bytes[]" }],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "executeModule",
+    inputs: [
+      { name: "module", type: "address" },
+      { name: "data", type: "bytes" },
+    ],
+    outputs: [{ name: "", type: "bytes" }],
+    stateMutability: "payable",
+  },
+  {
+    type: "function",
+    name: "factory",
+    inputs: [],
+    outputs: [{ name: "", type: "address" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getCurrentCycle",
+    inputs: [],
+    outputs: [
+      { name: "status", type: "uint8" },
+      { name: "assetsAtCycleStart", type: "uint256" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getMaxDeposit",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalTVL",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getTotalUsers",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getUserDeposit",
+    inputs: [{ name: "user", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "isTargetAssetWhitelisted",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "openDeposits",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "openWithdrawals",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "pause",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "paused",
+    inputs: [],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "removeTargetAsset",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "setMaxDeposit",
+    inputs: [{ name: "maxDeposit", type: "uint256" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "startTrading",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "templateId",
+    inputs: [],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "unpause",
+    inputs: [],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "whitelistTargetAsset",
+    inputs: [{ name: "asset", type: "address" }],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+
+  // === Access control ===
+  {
+    type: "function",
+    name: "getRoleAdmin",
+    inputs: [{ name: "role", type: "bytes32" }],
+    outputs: [{ name: "", type: "bytes32" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "grantRole",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "hasRole",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "renounceRole",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "callerConfirmation", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "revokeRole",
+    inputs: [
+      { name: "role", type: "bytes32" },
+      { name: "account", type: "address" },
+    ],
+    outputs: [],
+    stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "supportsInterface",
+    inputs: [{ name: "interfaceId", type: "bytes4" }],
+    outputs: [{ name: "", type: "bool" }],
+    stateMutability: "view",
+  },
+
+  // === Events ===
+  {
+    type: "event",
+    name: "Approval",
+    inputs: [
+      { name: "owner", type: "address", indexed: true },
+      { name: "spender", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "CycleStatusChanged",
+    inputs: [
+      { name: "status", type: "uint8", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Deposit",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "assets", type: "uint256", indexed: false },
+      { name: "shares", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "FeesCollected",
+    inputs: [
+      { name: "protocolFee", type: "uint256", indexed: false },
+      { name: "daoFee", type: "uint256", indexed: false },
+      { name: "curatorFee", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "MaxDepositUpdated",
+    inputs: [
+      { name: "maxDeposit", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "ModuleExecuted",
+    inputs: [
+      { name: "module", type: "address", indexed: true },
+      { name: "success", type: "bool", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Paused",
+    inputs: [
+      { name: "account", type: "address", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "RoleAdminChanged",
+    inputs: [
+      { name: "role", type: "bytes32", indexed: true },
+      { name: "previousAdminRole", type: "bytes32", indexed: true },
+      { name: "newAdminRole", type: "bytes32", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "RoleGranted",
+    inputs: [
+      { name: "role", type: "bytes32", indexed: true },
+      { name: "account", type: "address", indexed: true },
+      { name: "sender", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "RoleRevoked",
+    inputs: [
+      { name: "role", type: "bytes32", indexed: true },
+      { name: "account", type: "address", indexed: true },
+      { name: "sender", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "TargetAssetRemoved",
+    inputs: [
+      { name: "asset", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "TargetAssetWhitelisted",
+    inputs: [
+      { name: "asset", type: "address", indexed: true },
+    ],
+  },
+  {
+    type: "event",
+    name: "Transfer",
+    inputs: [
+      { name: "from", type: "address", indexed: true },
+      { name: "to", type: "address", indexed: true },
+      { name: "value", type: "uint256", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Unpaused",
+    inputs: [
+      { name: "account", type: "address", indexed: false },
+    ],
+  },
+  {
+    type: "event",
+    name: "Withdraw",
+    inputs: [
+      { name: "sender", type: "address", indexed: true },
+      { name: "receiver", type: "address", indexed: true },
+      { name: "owner", type: "address", indexed: true },
+      { name: "assets", type: "uint256", indexed: false },
+      { name: "shares", type: "uint256", indexed: false },
+    ],
+  },
+] as const;
