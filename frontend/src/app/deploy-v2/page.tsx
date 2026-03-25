@@ -398,7 +398,7 @@ export default function DeployV2Page() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Select a Strategy to Deploy</h1>
+        <h1 className="text-2xl font-bold text-white">Select Strategy</h1>
       </div>
 
       <ProgressBar currentStep={step} />
@@ -439,7 +439,7 @@ export default function DeployV2Page() {
               <div className="absolute inset-0 bg-black/70" />
               <div className="relative p-5">
                 <h3 className="text-lg font-bold text-white">Strategy Under Review</h3>
-                <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by external strategists</p>
+                <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by strategists</p>
                 <p className="text-sm text-[#FB5F07]">Evaluated by Dirac quants</p>
               </div>
             </div>
@@ -865,7 +865,7 @@ export default function DeployV2Page() {
                 <li>Backtest</li>
               </ul>
             </div>
-            <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac team.</p>
+            <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac</p>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowSubmitModal(false)} className="btn-secondary px-4 py-2 rounded-lg text-sm">Close</button>
               <a href="https://discord.com/invite/xQVwD9Xad9" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
