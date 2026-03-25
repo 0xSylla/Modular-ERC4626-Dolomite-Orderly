@@ -108,8 +108,10 @@ export default function DeployV2Page() {
   const [vaultSymbol, setVaultSymbol] = useState("");
   const [depositToken, setDepositToken] = useState<`0x${string}`>(addresses.USDC);
   const [maxDeposit, setMaxDeposit]   = useState("");
-  const [curatorFeeBps, setCuratorFeeBps] = useState(100);
-  const [feeRecipient, setFeeRecipient]   = useState("");
+  const [performanceFee, setPerformanceFee] = useState("");
+  const [managementFee, setManagementFee]   = useState("");
+  const [feeRecipient, setFeeRecipient]     = useState("");
+  const curatorFeeBps = Math.round((Number(performanceFee) || 0) * 100);
   const [selectedAssets, setSelectedAssets] = useState<Set<string>>(new Set());
   const [selectedSwapAddr,    setSelectedSwapAddr]    = useState("");
   const [selectedLendingAddr, setSelectedLendingAddr] = useState("");
@@ -357,8 +359,8 @@ export default function DeployV2Page() {
     Number(maxDeposit) > 0;
 
   const isFeesValid =
-    curatorFeeBps >= 0 &&
-    curatorFeeBps <= 200 &&
+    performanceFee.length > 0 &&
+    managementFee.length > 0 &&
     /^0x[a-fA-F0-9]{40}$/.test(feeRecipient);
 
   const isRiskValid = rebalanceThreshold >= 1 && rebalanceThreshold <= 45;
@@ -683,7 +685,7 @@ export default function DeployV2Page() {
                 </div>
 
                 <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
-                  Backtest is historical — past performance does not guarantee future results. Parameters saved locally for the rebalancing bot.
+                  Historical Simulation. Past performance is not indicative of future results.
                 </div>
               </div>
             </AccordionSection>
@@ -691,28 +693,28 @@ export default function DeployV2Page() {
 
           {/* --- Vault Info Section --- */}
           <AccordionSection
-            title="Vault Info"
-            subtitle={vaultName ? `${vaultName} (${vaultSymbol})` : "Name, symbol, deposit token"}
+            title="Vault Parameters"
+            subtitle={vaultName ? `${vaultName} (${vaultSymbol})` : ""}
             isOpen={openSections.has("vault")}
             onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("vault") ? n.delete("vault") : n.add("vault"); return n; })}
             isValid={isConfigValid}
           >
             <Field label="Vault Name">
               <input type="text" value={vaultName} onChange={(e) => setVaultName(e.target.value)}
-                placeholder="e.g. Dirac Delta Neutral USDC" className={inputClass} />
+                placeholder="e.g. Delta Neutral ETH" className={inputClass} />
             </Field>
             <Field label="Vault Symbol">
               <input type="text" value={vaultSymbol} onChange={(e) => setVaultSymbol(e.target.value)}
-                placeholder="e.g. dUSDC" className={inputClass} />
+                placeholder="e.g. dnETH" className={inputClass} />
             </Field>
-            <Field label="Deposit Token">
+            <Field label="Deposit Asset">
               <select value={depositToken} onChange={(e) => setDepositToken(e.target.value as `0x${string}`)} className={inputClass}>
                 {DEPOSIT_TOKENS.map((t) => (
                   <option key={t.address} value={t.address}>{t.label} ({t.address.slice(0, 6)}...{t.address.slice(-4)})</option>
                 ))}
               </select>
             </Field>
-            <Field label="Max Deposit (human units, e.g. 1000000 for 1M USDC)">
+            <Field label="Capacity">
               <input type="number" min="0" value={maxDeposit} onChange={(e) => setMaxDeposit(e.target.value)}
                 placeholder="1000000" className={inputClass} />
             </Field>
@@ -721,37 +723,19 @@ export default function DeployV2Page() {
           {/* --- Fees Section --- */}
           <AccordionSection
             title="Fees"
-            subtitle={`Curator: ${(curatorFeeBps / 100).toFixed(2)}%${protocolFeeBps !== null && daoFeeBps !== null ? ` | Total: ${((protocolFeeBps + daoFeeBps + curatorFeeBps) / 100).toFixed(2)}%` : ""}`}
+            subtitle={performanceFee || managementFee ? `Perf: ${performanceFee || 0}% · Mgmt: ${managementFee || 0}%` : ""}
             isOpen={openSections.has("fees")}
             onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("fees") ? n.delete("fees") : n.add("fees"); return n; })}
             isValid={isFeesValid}
           >
-            {/* Protocol fees info */}
-            <div className="rounded-lg border border-[#3C323A] bg-[#252525]/60 p-4 space-y-3">
-              <p className="text-xs font-medium text-[#818181] uppercase tracking-wide">Protocol Fees (set by Dirac)</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-[#818181]">Protocol Fee</p>
-                  <p className="text-sm font-medium text-white">
-                    {protocolFeeBps !== null ? `${(protocolFeeBps / 100).toFixed(2)}%` : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[#818181]">DAO Fee</p>
-                  <p className="text-sm font-medium text-white">
-                    {daoFeeBps !== null ? `${(daoFeeBps / 100).toFixed(2)}%` : "—"}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <Field label="Performance Fee">
+              <input type="text" value={performanceFee} onChange={(e) => setPerformanceFee(e.target.value)}
+                placeholder="e.g. 10%" className={inputClass} />
+            </Field>
 
-            <Field label={`Curator Fee: ${(curatorFeeBps / 100).toFixed(2)}% (${curatorFeeBps} bps)`}>
-              <input type="range" min={0} max={200} step={1} value={curatorFeeBps}
-                onChange={(e) => setCuratorFeeBps(Number(e.target.value))}
-                className="w-full accent-orange-500" />
-              <div className="flex justify-between text-xs text-[#818181] mt-1">
-                <span>0%</span><span>1%</span><span>2% max</span>
-              </div>
+            <Field label="Management Fee">
+              <input type="text" value={managementFee} onChange={(e) => setManagementFee(e.target.value)}
+                placeholder="e.g. 0.5%" className={inputClass} />
             </Field>
 
             <Field label="Curator Fee Recipient">
@@ -806,27 +790,55 @@ export default function DeployV2Page() {
 
       {/* ========================== STEP 3: REVIEW ========================= */}
       {step === "review" && (
-        <div className="p-6 rounded-xl bg-[#252525]/60 border border-[#3C323A] space-y-6">
+        <div className="space-y-6">
           <h2 className="text-lg font-semibold text-white">Review &amp; Deploy</h2>
 
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <SummaryRow label="Strategy"      value={selectedTemplate?.name ?? template} />
-            <SummaryRow label="Vault Name"    value={vaultName} />
-            <SummaryRow label="Vault Symbol"  value={vaultSymbol} />
-            <SummaryRow label="Deposit Token" value={depositTokenLabel} />
-            <SummaryRow label="Max Deposit"   value={`${Number(maxDeposit).toLocaleString()} ${depositTokenLabel}`} />
-            <SummaryRow label="Curator Fee"   value={`${(curatorFeeBps / 100).toFixed(2)}%`} />
-            <SummaryRow label="Fee Recipient" value={`${feeRecipient.slice(0, 6)}...${feeRecipient.slice(-4)}`} full />
-            <SummaryRow label="Collateral Assets" value={Array.from(selectedAssets).map(assetLabel).join(", ")} full />
-            <SummaryRow label="Swap Module"    value={moduleLabel(selectedSwapAddr)} />
-            <SummaryRow label="Lending Protocol" value={moduleLabel(selectedLendingAddr)} />
-            <SummaryRow label="Perps Protocol"   value={moduleLabel(selectedPerpsAddr)} />
-            <SummaryRow label="Rebalancing Threshold" value={`${rebalanceThreshold}%`} />
-            <SummaryRow label="Execution Mode" value={execMode.toUpperCase()} />
-          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {/* Strategy */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Strategy</p>
+              <p className="text-sm font-semibold text-white">{selectedTemplate?.name ?? template}</p>
+            </div>
 
-          <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
-            Your wallet will prompt you to sign each transaction in sequence.
+            {/* Network */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Network</p>
+              <p className="text-sm font-semibold text-white">{addresses.name}</p>
+            </div>
+
+            {/* Vault */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4 space-y-1">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Vault</p>
+              <p className="text-xs text-[#818181]">Name: <span className="text-white">{vaultName}</span></p>
+              <p className="text-xs text-[#818181]">Symbol: <span className="text-white">{vaultSymbol}</span></p>
+              <p className="text-xs text-[#818181]">Deposit Asset: <span className="text-white">{depositTokenLabel}</span></p>
+              <p className="text-xs text-[#818181]">Capacity: <span className="text-white">{Number(maxDeposit).toLocaleString()}</span></p>
+            </div>
+
+            {/* Execution */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4 space-y-1">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Execution</p>
+              <p className="text-xs text-[#818181]">Lending: <span className="text-white">{moduleLabel(selectedLendingAddr)}</span></p>
+              <p className="text-xs text-[#818181]">Perps: <span className="text-white">{moduleLabel(selectedPerpsAddr)}</span></p>
+              <p className="text-xs text-[#818181]">Mode: <span className="text-white">{execMode.toUpperCase()}</span></p>
+            </div>
+
+            {/* Risk Parameters */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4 space-y-1">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Risk Parameters</p>
+              <p className="text-xs text-[#818181]">Rebalancing Threshold: <span className="text-white">{rebalanceThreshold}%</span></p>
+              {fundingFilterOn && (
+                <p className="text-xs text-[#818181]">Funding Filter: <span className="text-white">{Math.round((fundingSlider / 100) * (-0.00033445) * 100000) / 10} bps</span></p>
+              )}
+            </div>
+
+            {/* Fees */}
+            <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4 space-y-1">
+              <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Fees</p>
+              <p className="text-xs text-[#818181]">Performance fee: <span className="text-white">{performanceFee}%</span></p>
+              <p className="text-xs text-[#818181]">Management fee: <span className="text-white">{managementFee}%</span></p>
+              <p className="text-xs text-[#818181]">Recipient: <span className="text-white font-mono">{feeRecipient.slice(0, 6)}...{feeRecipient.slice(-4)}</span></p>
+            </div>
           </div>
 
           <div className="flex justify-between pt-2">
