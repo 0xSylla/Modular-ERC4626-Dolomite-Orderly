@@ -416,8 +416,9 @@ export default function DeployV2Page() {
                   key={t.id}
                   onClick={() => setTemplate(t.id)}
                   className={`text-left p-6 rounded-xl border-2 transition-all ${
-                    isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/60 hover:border-[#818181]"
+                    isSelected ? "border-[#FB5F07]" : "border-[#3C323A] bg-[#252525]/60 hover:border-[#818181]"
                   }`}
+                  style={isSelected ? { background: "linear-gradient(135deg, #2d1a0e 0%, #3a1f10 30%, #4a2510 60%, #5a2a12 100%)" } : undefined}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
@@ -435,8 +436,8 @@ export default function DeployV2Page() {
 
           {/* Strategy Under Review cards */}
           {[0, 1].map((i) => (
-            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]" style={{ background: "linear-gradient(135deg, #2d1a2e 0%, #3a1538 30%, #5a2a4a 60%, #7a3a5a 100%)" }}>
-              <div className="absolute inset-0 bg-black/70" />
+            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "linear-gradient(135deg, #1a1018 0%, #221020 30%, #2a1528 60%, #321a30 100%)" }}>
+              <div className="absolute inset-0 bg-black/50" />
               <div className="relative p-5">
                 <h3 className="text-lg font-bold text-white">Strategy Under Review</h3>
                 <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by strategists</p>
