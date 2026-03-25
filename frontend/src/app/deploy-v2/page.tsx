@@ -847,6 +847,34 @@ export default function DeployV2Page() {
           )}
         </div>
       )}
+
+      {/* ========================== SUBMIT STRATEGY MODAL ================= */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSubmitModal(false)}>
+          <div className="rounded-xl border border-[#3C323A] bg-[#171717] p-6 max-w-md w-full mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-white">Submit a Strategy</h2>
+            <p className="text-sm text-[#818181]">
+              Submit your strategy via a ticket on Dirac Discord.
+            </p>
+            <div className="text-sm text-white space-y-1">
+              <p className="text-[#818181] mb-2">Include:</p>
+              <ul className="list-disc list-inside space-y-1 text-[#818181]">
+                <li>Description</li>
+                <li>Yield sources</li>
+                <li>Risks</li>
+                <li>Backtest</li>
+              </ul>
+            </div>
+            <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac team.</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setShowSubmitModal(false)} className="btn-secondary px-4 py-2 rounded-lg text-sm">Close</button>
+              <a href="https://discord.gg/dirac" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
+                Go to Discord
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1166,34 +1194,6 @@ function DeployModal({
           </div>
         )}
       </div>
-
-      {/* ========================== SUBMIT STRATEGY MODAL ================= */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSubmitModal(false)}>
-          <div className="rounded-xl border border-[#3C323A] bg-[#171717] p-6 max-w-md w-full mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-xl font-bold text-white">Submit a Strategy</h2>
-            <p className="text-sm text-[#818181]">
-              Submit your strategy via a ticket on Dirac Discord.
-            </p>
-            <div className="text-sm text-white space-y-1">
-              <p className="text-[#818181] mb-2">Include:</p>
-              <ul className="list-disc list-inside space-y-1 text-[#818181]">
-                <li>Description</li>
-                <li>Yield sources</li>
-                <li>Risks</li>
-                <li>Backtest</li>
-              </ul>
-            </div>
-            <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac team.</p>
-            <div className="flex justify-end gap-3 pt-2">
-              <button onClick={() => setShowSubmitModal(false)} className="btn-secondary px-4 py-2 rounded-lg text-sm">Close</button>
-              <a href="https://discord.gg/dirac" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
-                Go to Discord
-              </a>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
