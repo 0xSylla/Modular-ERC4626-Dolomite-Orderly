@@ -420,7 +420,7 @@ export default function DeployV2Page() {
                   }`}
                   style={{ background: isSelected
                     ? "linear-gradient(135deg, #2d1a0e 0%, #3a1f10 30%, #4a2510 60%, #5a2a12 100%)"
-                    : "linear-gradient(135deg, #1a1018 0%, #221020 30%, #2a1528 60%, #321a30 100%)"
+                    : "#111111"
                   }}
                 >
                   <div className="flex items-start justify-between">
@@ -439,8 +439,8 @@ export default function DeployV2Page() {
 
           {/* Strategy Under Review cards */}
           {[0, 1].map((i) => (
-            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "linear-gradient(135deg, #2d1a0e 0%, #3a1f10 30%, #4a2510 60%, #5a2a12 100%)" }}>
-              <div className="absolute inset-0 bg-black/50" />
+            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "linear-gradient(135deg, #1a1018 0%, #221020 30%, #2a1528 60%, #321a30 100%)" }}>
+              <div className="absolute inset-0 bg-black/60" />
               <div className="relative p-5">
                 <h3 className="text-lg font-bold text-white">Strategy Under Review</h3>
                 <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by strategists</p>
