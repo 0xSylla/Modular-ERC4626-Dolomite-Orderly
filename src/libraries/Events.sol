@@ -31,7 +31,7 @@ library Events {
     event CycleStatusChanged(Data.TradeCycleStatus newStatus);
     event TargetAssetWhitelisted(address indexed asset);
     event TargetAssetRemoved(address indexed asset);
-    event VaultLegsSet(address indexed vault, address swapModule, address lendingModule, address perpsModule);
+    event VaultLegsSet(address indexed vault, bytes32 swapModuleType, bytes32 lendingModuleType, bytes32 perpsModuleType);
     event PositionDefined(uint256 indexed positionId, address indexed collateralAsset, string perpsAsset, uint256 allocation);
     event PositionRemoved(uint256 indexed positionId);
     event PositionUpdated(uint256 indexed positionId);

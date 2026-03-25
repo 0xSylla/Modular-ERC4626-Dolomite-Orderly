@@ -14,10 +14,13 @@ import {Data} from "../libraries/Data.sol";
 import {Events} from "../libraries/Events.sol";
 import {VaultStorage} from "../libraries/VaultStorage.sol";
 import {IDiracVault} from "../interfaces/IDiracVault.sol";
+import {IDiracVaultFactory} from "../interfaces/IDiracVaultFactory.sol";
 
 /// @title DiracVault
 /// @notice ERC4626 vault with windowed trade cycles, multi-strategy support, and delegatecall-based module execution
 /// @dev No proxy — standalone immutable contract. Strategy logic lives in modules executed via delegatecall.
+///      Module addresses are resolved from the factory registry at execution time via type hashes.
+///      This allows seamless module upgrades: update the factory registry and all vaults follow.
 contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDiracVault {
     using SafeERC20 for IERC20;
 
@@ -41,7 +44,7 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         bytes32 _templateId,
         Data.CuratorFeeConfig memory _curatorFee,
         Data.ProtocolFees memory _protocolFees,
-        address[] memory _modules
+        bytes32[] memory _moduleTypes
     ) ERC4626(IERC20(_depositToken)) ERC20(_name, _symbol) {
         if (_factory == address(0)) revert Events.ZeroAddress();
         factory = _factory;
@@ -60,14 +63,25 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         vs.curatorFee = _curatorFee;
         vs.protocolFees = _protocolFees;
 
-        for (uint256 i = 0; i < _modules.length; i++) {
-            vs.whitelistedModules[_modules[i]] = true;
+        for (uint256 i = 0; i < _moduleTypes.length; i++) {
+            vs.whitelistedModuleTypes[_moduleTypes[i]] = true;
         }
     }
 
     // ============ Inflation Attack Protection ============
     function _decimalsOffset() internal pure override returns (uint8) {
         return 6;
+    }
+
+    // ============ Internal: Resolve Module ============
+
+    /// @dev Resolves a module type hash to its current implementation address from the factory registry.
+    ///      Reverts if the module type is not whitelisted on this vault or not registered on the factory.
+    function _resolveModule(bytes32 moduleType) internal view returns (address module) {
+        VaultStorage.Layout storage vs = VaultStorage.layout();
+        if (!vs.whitelistedModuleTypes[moduleType]) revert Events.ModuleNotWhitelisted();
+        module = IDiracVaultFactory(factory).getModule(moduleType);
+        if (module == address(0)) revert Events.ModuleNotWhitelisted();
     }
 
     // ============ ERC4626 Overrides ============
@@ -190,11 +204,10 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
     /// @notice One-time module setup — callable by operator at any cycle state.
     ///         Used to initialize module storage (e.g. set Orderly vault address) before trading starts.
     function setupModule(
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external onlyRole(OPERATOR_ROLE) whenNotPaused nonReentrant returns (bytes memory) {
-        VaultStorage.Layout storage vs = VaultStorage.layout();
-        if (!vs.whitelistedModules[module]) revert Events.ModuleNotWhitelisted();
+        address module = _resolveModule(moduleType);
         (bool ok, bytes memory result) = module.delegatecall(data);
         if (!ok) revert Events.ModuleExecutionFailed();
         emit Events.ModuleExecuted(module, false);
@@ -202,7 +215,7 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
     }
 
     function executeModule(
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     )
         external
@@ -213,10 +226,10 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         returns (bytes memory)
     {
         VaultStorage.Layout storage vs = VaultStorage.layout();
-        if (!vs.whitelistedModules[module]) revert Events.ModuleNotWhitelisted();
         if (vs.currentCycle.status != Data.TradeCycleStatus.TRADING)
             revert Events.NotInTradingPeriod();
 
+        address module = _resolveModule(moduleType);
         (bool ok, bytes memory result) = module.delegatecall(data);
         if (!ok) revert Events.ModuleExecutionFailed();
         emit Events.ModuleExecuted(module, true);
@@ -224,7 +237,7 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
     }
 
     function executeBatch(
-        address[] calldata modules,
+        bytes32[] calldata moduleTypes,
         bytes[] calldata datas
     )
         external
@@ -234,17 +247,16 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         nonReentrant
         returns (bytes[] memory results)
     {
-        if (modules.length != datas.length) revert Events.ArrayLengthMismatch();
+        if (moduleTypes.length != datas.length) revert Events.ArrayLengthMismatch();
 
         VaultStorage.Layout storage vs = VaultStorage.layout();
         if (vs.currentCycle.status != Data.TradeCycleStatus.TRADING)
             revert Events.NotInTradingPeriod();
 
-        results = new bytes[](modules.length);
-        for (uint256 i = 0; i < modules.length; i++) {
-            if (!vs.whitelistedModules[modules[i]])
-                revert Events.ModuleNotWhitelisted();
-            (bool ok, bytes memory result) = modules[i].delegatecall(datas[i]);
+        results = new bytes[](moduleTypes.length);
+        for (uint256 i = 0; i < moduleTypes.length; i++) {
+            address module = _resolveModule(moduleTypes[i]);
+            (bool ok, bytes memory result) = module.delegatecall(datas[i]);
             if (!ok) revert Events.ModuleExecutionFailed();
             results[i] = result;
         }
@@ -332,14 +344,24 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
     }
 
     function emergencyExecuteModule(
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external payable onlyRole(OWNER_ROLE) nonReentrant returns (bytes memory) {
-        VaultStorage.Layout storage vs = VaultStorage.layout();
-        if (!vs.whitelistedModules[module]) revert Events.ModuleNotWhitelisted();
+        address module = _resolveModule(moduleType);
         (bool ok, bytes memory result) = module.delegatecall(data);
         if (!ok) revert Events.ModuleExecutionFailed();
         return result;
+    }
+
+    /// @notice Rescue tokens stuck in the vault (e.g. after failed module ops with 0 shares outstanding).
+    ///         Cannot rescue the deposit token if there are outstanding shares.
+    function emergencyRescueToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(OWNER_ROLE) {
+        if (token == asset() && totalSupply() > 0) revert Events.OperationFailed();
+        IERC20(token).safeTransfer(to, amount);
     }
 
     // ============ View Functions ============
@@ -356,6 +378,12 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         address asset
     ) external view returns (bool) {
         return VaultStorage.layout().vaultTargetAssets[asset];
+    }
+
+    function isModuleTypeWhitelisted(
+        bytes32 moduleType
+    ) external view returns (bool) {
+        return VaultStorage.layout().whitelistedModuleTypes[moduleType];
     }
 
     function getMaxDeposit() external view returns (uint256) {

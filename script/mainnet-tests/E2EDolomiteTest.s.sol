@@ -90,7 +90,7 @@ contract E2EDolomiteTest is Script {
         vault.startTrading();
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized (operators set).");
@@ -108,7 +108,7 @@ contract E2EDolomiteTest is Script {
         console.log("Quote: minAmountOut:", minOut1);
 
         vault.executeModule(
-            address(kodiakModule),
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (USDC, false, depositAmount, IBGT, false, minOut1, swapData1, feeData1)
@@ -123,7 +123,7 @@ contract E2EDolomiteTest is Script {
         console.log("\n--- Step 5: Supply iBGT to Dolomite ---");
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.supplyCollateral,
                 (IBGT, type(uint256).max, DIBGT_MARKET_ID)
@@ -138,7 +138,7 @@ contract E2EDolomiteTest is Script {
         console.log("\n--- Step 6: Withdraw iBGT from Dolomite ---");
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.withdrawCollateral,
                 (0, DIBGT_MARKET_ID) // 0 = withdraw all
@@ -162,7 +162,7 @@ contract E2EDolomiteTest is Script {
 
         // Use type(uint256).max to swap actual on-chain balance (may differ from simulation)
         vault.executeModule(
-            address(kodiakModule),
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (IBGT, false, type(uint256).max, USDC, false, minOut2, swapData2, feeData2)

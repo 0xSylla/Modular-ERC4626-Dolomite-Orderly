@@ -39,7 +39,11 @@ contract DeployDirac is Script {
     uint256 constant ARB_DOLOMITE_USDC_ID = 17; // Native USDC (0xaf88d0...) on Arbitrum Dolomite
     uint256 constant ARB_DOLOMITE_WBTC_ID = 4;  // WBTC market ID on Arbitrum Dolomite
     uint256 constant ARB_DOLOMITE_WETH_ID = 0;  // WETH market ID on Arbitrum Dolomite
-    address constant ARB_WSTETH = 0x5979d7B546E38E9Ab8B0d483b5C0c2C99b27C399;
+    address constant ARB_WSTETH = 0x5979D7b546E38E414F7E9822514be443A4800529;
+    // Morpho wstETH/USDC market params (market ID 0x33e0c8ab...)
+    address constant MORPHO_WSTETH_ORACLE = 0x8e02a9b9Cc29d783b2fCB71C3a72651B591cae31;
+    address constant MORPHO_WSTETH_IRM    = 0x66F30587FB8D4206918deb78ecA7d5eBbafD06DA;
+    uint256 constant MORPHO_WSTETH_LLTV   = 860000000000000000; // 86%
 
     // ============ Ethereum Mainnet ============
     address constant ETH_USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
@@ -208,11 +212,11 @@ contract DeployDirac is Script {
             wstethPerps[0] = "ETH"; // wstETH hedges against ETH
             factory.whitelistStrategyAsset(Data.AssetInfo({ token: ARB_WSTETH, allowedPerpsAssets: wstethPerps }));
             factory.setModuleLendingConfig(morphoTypeHash, ARB_WSTETH, abi.encode(
-                ARB_USDC,    // loanToken
-                ARB_WSTETH,  // collateralToken
-                address(0),  // oracle  - TODO: set actual Morpho oracle
-                address(0),  // irm     - TODO: set actual Morpho IRM
-                uint256(0)   // lltv    - TODO: set actual LLTV
+                ARB_USDC,              // loanToken
+                ARB_WSTETH,            // collateralToken
+                MORPHO_WSTETH_ORACLE,  // oracle
+                MORPHO_WSTETH_IRM,     // irm
+                MORPHO_WSTETH_LLTV     // lltv (86%)
             ));
             factory.setPerpsModuleSymbol(ARB_WSTETH, orderlyTypeHash, bytes("PERP_ETH_USDC"));
             console.log("wstETH whitelisted (Morpho, hedge: ETH).");

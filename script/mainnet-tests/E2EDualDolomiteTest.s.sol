@@ -46,12 +46,12 @@ contract E2EDualDolomiteTest is Script {
         address factoryAddr = vm.envAddress("FACTORY_ADDR");
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 1: Create Dual Vaults ===");
         console.log("Deployer:", deployer);
         console.log("Factory:", factoryAddr);
-        console.log("DolomiteModule:", dolomiteModule);
+        console.log("DolomiteModule type hash set");
         console.log("Deployer USDC:", IERC20(USDC).balanceOf(deployer));
 
         vm.startBroadcast(pk);
@@ -101,7 +101,7 @@ contract E2EDualDolomiteTest is Script {
         console.log("\nNext: phase2_deposit()");
     }
 
-    function _bootstrapVault(DiracVault vault, address dolomiteModule, address targetAsset, address deployer) internal {
+    function _bootstrapVault(DiracVault vault, bytes32 dolomiteModule, address targetAsset, address deployer) internal {
         vault.openDeposits();
         IERC20(USDC).approve(address(vault), 1);
         vault.deposit(1, deployer);
@@ -168,8 +168,8 @@ contract E2EDualDolomiteTest is Script {
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault ibgtVault = DiracVault(payable(ibgtVaultAddr));
         DiracVault wethVault = DiracVault(payable(wethVaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(400_000)); // 0.4 USDC
 
@@ -259,8 +259,8 @@ contract E2EDualDolomiteTest is Script {
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault ibgtVault = DiracVault(payable(ibgtVaultAddr));
         DiracVault wethVault = DiracVault(payable(wethVaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(400_000));
         uint256 repayAmount  = vm.envOr("REPAY_AMOUNT",  borrowAmount);

@@ -118,7 +118,7 @@ contract E2EBorrowTestPhased is Script {
         vault.startTrading();
 
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized");
@@ -155,35 +155,35 @@ contract E2EBorrowTestPhased is Script {
 
         // --- Supply iBGT to Dolomite isolation mode (market 38) ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.supplyCollateral, (IBGT, type(uint256).max, DIBGT_MARKET_ID))
         );
         console.log("Supplied iBGT. Vault iBGT:", IERC20(IBGT).balanceOf(vaultAddr));
 
         // --- Borrow USDC ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.borrow, (BORROW_AMOUNT, DIBGT_MARKET_ID, USDC_MARKET_ID))
         );
         console.log("Borrowed. Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
 
         // --- RepayDebt (auto amount = 101% of debt) ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.repayDebt, (USDC, 0, DIBGT_MARKET_ID, USDC_MARKET_ID))
         );
         console.log("Debt repaid. Vault iBGT:", IERC20(IBGT).balanceOf(vaultAddr));
 
         // --- Supply iBGT again ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.supplyCollateral, (IBGT, type(uint256).max, DIBGT_MARKET_ID))
         );
         console.log("Re-supplied. Vault iBGT:", IERC20(IBGT).balanceOf(vaultAddr));
 
         // --- Borrow USDC again ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.borrow, (BORROW_AMOUNT, DIBGT_MARKET_ID, USDC_MARKET_ID))
         );
         console.log("Re-borrowed. Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -199,7 +199,7 @@ contract E2EBorrowTestPhased is Script {
 
         // --- RepayDebtWithCollateral (atomic diBGT → iBGT → USDC zap) ---
         vault.executeModule(
-            dolomiteModuleAddr,
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteBeraModule.repayDebtWithCollateral,
                 (IBGT, USDC, minOut, expectedOut, pathDef, DIBGT_MARKET_ID, USDC_MARKET_ID)

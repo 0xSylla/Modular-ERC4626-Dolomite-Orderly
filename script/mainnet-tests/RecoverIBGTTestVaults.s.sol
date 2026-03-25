@@ -27,8 +27,8 @@ contract RecoverIBGTTestVaults is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 vaultUSDC = IERC20(USDC).balanceOf(vaultAddr);
         uint256 vaultIBGT = IERC20(IBGT).balanceOf(vaultAddr);

@@ -29,9 +29,9 @@ library Data {
     }
 
     struct LegConfig {
-        address swapModule;
-        address lendingModule;
-        address perpsModule;
+        bytes32 swapModuleType;
+        bytes32 lendingModuleType;
+        bytes32 perpsModuleType;
     }
 
     struct Position {

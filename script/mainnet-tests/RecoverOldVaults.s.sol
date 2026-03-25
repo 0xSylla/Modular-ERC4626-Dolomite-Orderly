@@ -49,12 +49,12 @@ contract RecoverOldVaults is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         DiracVault vault = DiracVault(payable(OLD_VAULT_A));
         DiracVaultFactory factory = DiracVaultFactory(OLD_FACTORY);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         uint256 usdcBal = IERC20(USDC).balanceOf(OLD_VAULT_A);
         console.log("=== Recover Vault A - Step 1: Repay ===");
         console.log("Vault USDC:", usdcBal);
-        console.log("Module:", dolomiteModule);
+        console.log("DolomiteModule type hash set");
 
         vm.startBroadcast(pk);
         // Repay debt with exact vault USDC balance (107% auto-calc exceeds balance)
@@ -75,10 +75,10 @@ contract RecoverOldVaults is Script {
         uint256 pk = vm.envUint("PRIVATE_KEY");
         DiracVault vault = DiracVault(payable(OLD_VAULT_A));
         DiracVaultFactory factory = DiracVaultFactory(OLD_FACTORY);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Recover Vault A: repayDebtWithCollateral ===");
-        console.log("Module:", dolomiteModule);
+        console.log("DolomiteModule type hash set");
         console.log("Vault USDC before:", IERC20(USDC).balanceOf(OLD_VAULT_A));
 
         // OogaBooga pathDefinition for iBGT -> USDC swap
@@ -134,7 +134,7 @@ contract RecoverOldVaults is Script {
         address user = vm.addr(pk);
         DiracVault vault = DiracVault(payable(OLD_VAULT_A));
         DiracVaultFactory factory = DiracVaultFactory(OLD_FACTORY);
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 ibgtBal = IERC20(IBGT).balanceOf(OLD_VAULT_A);
         console.log("=== Recover Vault A - Step 2: Swap + Withdraw ===");

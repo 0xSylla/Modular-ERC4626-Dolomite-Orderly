@@ -126,7 +126,7 @@ contract E2ECleanTest is Script {
         // --- 10. Initialize Dolomite Module ---
         router.executeModule(
             vaultAddr,
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite initialized");
@@ -134,7 +134,7 @@ contract E2ECleanTest is Script {
         // --- 11. Initialize Orderly Module ---
         router.executeModule(
             vaultAddr,
-            address(orderlyModule),
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.initializeModule, (ORDERLY_VAULT))
         );
         console.log("Orderly module initialized");
@@ -143,7 +143,7 @@ contract E2ECleanTest is Script {
         bytes32 brokerHash = keccak256(abi.encodePacked(BROKER_ID));
         router.executeModule(
             vaultAddr,
-            address(orderlyModule),
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.delegateSigner, (
                 VaultTypes.VaultDelegate({brokerHash: brokerHash, delegateSigner: deployer})
             ))
@@ -222,7 +222,7 @@ contract E2ECleanTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 swapAmount = IERC20(USDC).balanceOf(vaultAddr);
         console.log("=== Phase 3: Swap USDC -> iBGT ===");
@@ -237,7 +237,7 @@ contract E2ECleanTest is Script {
         vm.startBroadcast(pk);
         router.executeModule(
             vaultAddr,
-            kodiakModule,
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (USDC, false, swapAmount, IBGT, false, minAmountOut, swapData, feeData)
@@ -263,9 +263,9 @@ contract E2ECleanTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
+        bytes32 orderlyModule = keccak256("perps.orderly");
 
         uint256 collateralAmount = vm.envUint("COLLATERAL_AMOUNT");
         uint256 borrowAmount = vm.envUint("BORROW_AMOUNT");
@@ -287,20 +287,20 @@ contract E2ECleanTest is Script {
         });
 
         // Build modules + datas arrays for executeBatch
-        address[] memory modules = new address[](3);
+        bytes32[] memory moduleTypes = new bytes32[](3);
         bytes[] memory datas = new bytes[](3);
 
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteLendingBase.supplyCollateral, (IBGT, collateralAmount, DIBGT_MARKET_ID)
         );
 
-        modules[1] = dolomiteModule;
+        moduleTypes[1] = keccak256("lending.dolomite");
         datas[1] = abi.encodeCall(
             DolomiteLendingBase.borrow, (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
         );
 
-        modules[2] = orderlyModule;
+        moduleTypes[2] = keccak256("perps.orderly");
         datas[2] = abi.encodeCall(
             OrderlyModule.deposit, (USDC, depositData, depositFee)
         );
@@ -320,7 +320,7 @@ contract E2ECleanTest is Script {
         router.requestOpeningPosition(vaultAddr, 0);
 
         // 3. Execute opening (operator: OPEN_REQUESTED → OPENING)
-        router.executeOpeningRequest{value: depositFee}(vaultAddr, 0, modules, datas);
+        router.executeOpeningRequest{value: depositFee}(vaultAddr, 0, moduleTypes, datas);
 
         // 4. Confirm open (operator: OPENING → ACTIVE)
         // In production, API waits for Orderly deposit to settle + opens short first.
@@ -351,7 +351,7 @@ contract E2ECleanTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 5: Close Strategy (repayDebtWithCollateral) ===");
         console.log("Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -370,10 +370,10 @@ contract E2ECleanTest is Script {
         console.log("OogaBooga expectedOut:", expectedUSDCOut);
         console.log("OogaBooga minOut:", minUSDCOut);
 
-        address[] memory modules = new address[](1);
+        bytes32[] memory moduleTypes = new bytes32[](1);
         bytes[] memory datas = new bytes[](1);
 
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteBeraModule.repayDebtWithCollateral,
             (IBGT, USDC, minUSDCOut, expectedUSDCOut, pathDefinition, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -383,7 +383,7 @@ contract E2ECleanTest is Script {
         // 1. Request close (curator: ACTIVE → CLOSE_REQUESTED)
         router.requestClosingPosition(vaultAddr, 0);
         // 2. Execute close (operator: CLOSE_REQUESTED → IDLE)
-        router.executeClosingRequest(vaultAddr, 0, modules, datas);
+        router.executeClosingRequest(vaultAddr, 0, moduleTypes, datas);
         vm.stopBroadcast();
 
         console.log("Strategy closed!");

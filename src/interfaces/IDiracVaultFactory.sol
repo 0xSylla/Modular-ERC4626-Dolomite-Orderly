@@ -44,9 +44,15 @@ interface IDiracVaultFactory {
     function emergencyEndCycle(address vault) external;
     function emergencyExecute(
         address vault,
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external payable;
+    function emergencyRescueToken(
+        address vault,
+        address token,
+        address to,
+        uint256 amount
+    ) external;
 
     // View
     function isVault(address vault) external view returns (bool);

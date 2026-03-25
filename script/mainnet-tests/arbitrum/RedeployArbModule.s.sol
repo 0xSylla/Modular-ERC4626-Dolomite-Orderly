@@ -20,7 +20,7 @@ contract RedeployArbModule is Script {
         DiracVaultFactory(factoryAddr).registerModule(keccak256("lending.dolomite"), address(newModule));
         VaultCuratorRouter(routerAddr).executeModule(
             vaultAddr,
-            address(newModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
 

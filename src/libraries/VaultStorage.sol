@@ -14,7 +14,7 @@ library VaultStorage {
         Data.ProtocolFees protocolFees;
         Data.TradeCycle currentCycle;
         mapping(address => uint256) userDeposits;
-        mapping(address => bool) whitelistedModules;
+        mapping(bytes32 => bool) whitelistedModuleTypes;
         mapping(address => bool) vaultTargetAssets;
     }
 

@@ -31,7 +31,7 @@ contract OperateVault is Script {
     function initializeDolomite() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         _startBroadcast();
         vault.executeModule(
@@ -46,7 +46,7 @@ contract OperateVault is Script {
     function setIsolationProxy() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         address proxy = vm.envAddress("ISOLATION_PROXY");
         uint256 marketId = vm.envUint("COLLATERAL_MARKET_ID");
 
@@ -63,7 +63,7 @@ contract OperateVault is Script {
     function initializeOrderly() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 orderlyModule = keccak256("perps.orderly");
         address orderlyVault = vm.envAddress("ORDERLY_VAULT");
 
         _startBroadcast();
@@ -79,7 +79,7 @@ contract OperateVault is Script {
     function delegateSigner() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 orderlyModule = keccak256("perps.orderly");
         bytes32 brokerHash = vm.envBytes32("BROKER_HASH");
         address delegateSigner_ = vm.envAddress("DELEGATE_SIGNER");
 
@@ -102,8 +102,8 @@ contract OperateVault is Script {
     function launchStrategy() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         // Read strategy 0 allocation from router
         address routerAddr = vm.envAddress("ROUTER_ADDR");
@@ -122,25 +122,25 @@ contract OperateVault is Script {
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(0));
         require(collateralAmount > 0 && borrowAmount > 0, "Set COLLATERAL_AMOUNT and BORROW_AMOUNT");
 
-        address[] memory modules = new address[](2);
+        bytes32[] memory moduleTypes = new bytes32[](2);
         bytes[] memory datas = new bytes[](2);
 
         // Step 1: Supply collateral
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteLendingBase.supplyCollateral,
             (IBGT, collateralAmount, DIBGT_MARKET_ID)
         );
 
         // Step 2: Borrow USDC
-        modules[1] = dolomiteModule;
+        moduleTypes[1] = keccak256("lending.dolomite");
         datas[1] = abi.encodeCall(
             DolomiteLendingBase.borrow,
             (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
         );
 
         _startBroadcast();
-        vault.executeBatch(modules, datas);
+        vault.executeBatch(moduleTypes, datas);
         vm.stopBroadcast();
 
         console.log("Strategy launched: Supply + Borrow executed.");
@@ -151,22 +151,22 @@ contract OperateVault is Script {
     function closeStrategy() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         uint256 repayAmount = vm.envOr("REPAY_AMOUNT", uint256(0));
 
-        address[] memory modules = new address[](1);
+        bytes32[] memory moduleTypes = new bytes32[](1);
         bytes[] memory datas = new bytes[](1);
 
         // Repay and close (automatically withdraws collateral)
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteLendingBase.repayDebt,
             (USDC, repayAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
         );
 
         _startBroadcast();
-        vault.executeBatch(modules, datas);
+        vault.executeBatch(moduleTypes, datas);
         vm.stopBroadcast();
 
         console.log("Strategy closed: Debt repaid, collateral withdrawn.");
@@ -176,7 +176,7 @@ contract OperateVault is Script {
     function repayWithCollateral() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         uint256 minUSDCOut = vm.envUint("MIN_USDC_OUT");
         uint256 expectedUSDCOut = vm.envUint("EXPECTED_USDC_OUT");
         bytes memory pathDefinition = vm.envBytes("PATH_DEFINITION");
@@ -198,7 +198,7 @@ contract OperateVault is Script {
     function swapKodiak() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         address tokenIn = vm.envOr("TOKEN_IN", USDC);
         address tokenOut = vm.envOr("TOKEN_OUT", IBGT);
@@ -239,7 +239,7 @@ contract OperateVault is Script {
     function supplyCollateral() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         uint256 amount = vm.envUint("SUPPLY_AMOUNT");
 
         _startBroadcast();
@@ -259,7 +259,7 @@ contract OperateVault is Script {
     function borrowAsset() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         uint256 amount = vm.envUint("BORROW_AMOUNT");
 
         _startBroadcast();
@@ -279,7 +279,7 @@ contract OperateVault is Script {
     function withdrawCollateral() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         uint256 amount = vm.envOr("WITHDRAW_AMOUNT", uint256(0)); // 0 = withdraw all
 
         _startBroadcast();
@@ -299,7 +299,7 @@ contract OperateVault is Script {
     function claimRewards() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
         uint256 marketId = vm.envUint("COLLATERAL_MARKET_ID");
 
         _startBroadcast();
@@ -316,7 +316,7 @@ contract OperateVault is Script {
     function depositToOrderly() external {
         (DiracVault vault, DiracVaultFactory factory) = _loadVault();
 
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 orderlyModule = keccak256("perps.orderly");
         uint256 amount = vm.envUint("ORDERLY_DEPOSIT_AMOUNT");
         bytes32 accountId = vm.envBytes32("ORDERLY_ACCOUNT_ID");
         bytes32 brokerHash = vm.envBytes32("BROKER_HASH");

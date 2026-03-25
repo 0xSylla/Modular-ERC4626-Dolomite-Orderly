@@ -44,7 +44,7 @@ contract RecoverVault is Script {
         // Note: use exact balance, not type(uint256).max — the on-chain module predates that fix
         factory.emergencyExecute(
             VAULT,
-            KODIAK_MODULE,
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (IBGT, false, ibgtBal, USDC, false, minOut, swapData, feeData)

@@ -110,7 +110,7 @@ contract E2EBeraWBTCTest is Script {
         vault.startTrading();
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized (routers authorized as operators).");
@@ -171,8 +171,8 @@ contract E2EBeraWBTCTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 swapAmount   = IERC20(USDC).balanceOf(vaultAddr);
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(400_000));
@@ -230,8 +230,8 @@ contract E2EBeraWBTCTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         // repayAmount = 0 → auto-calculate (107% of debt). Requires vault to have enough USDC.
         // For a short test set REPAY_AMOUNT = BORROW_AMOUNT (no interest accrued in seconds).

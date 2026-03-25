@@ -71,12 +71,6 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
         if (!registeredTemplates[templateId])
             revert Events.TemplateNotRegistered();
 
-        // Collect all registered module addresses
-        address[] memory modules = new address[](moduleTypes.length);
-        for (uint256 i = 0; i < moduleTypes.length; i++) {
-            modules[i] = registeredModules[moduleTypes[i]];
-        }
-
         DiracVault vault = new DiracVault(
             msg.sender,
             address(this),
@@ -88,7 +82,7 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
             templateId,
             curatorFee,
             protocolFees,
-            modules
+            moduleTypes
         );
 
         address vaultAddr = address(vault);
@@ -370,12 +364,23 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
 
     function emergencyExecute(
         address vault,
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external payable override onlyRole(DIRAC_ADMIN_ROLE) {
         if (!_isVault[vault]) revert Events.NotFactoryVault();
-        DiracVault(payable(vault)).emergencyExecuteModule{value: msg.value}(module, data);
+        DiracVault(payable(vault)).emergencyExecuteModule{value: msg.value}(moduleType, data);
         emit Events.EmergencyAction(vault, "executeModule");
+    }
+
+    /// @notice Rescue stuck tokens from a vault (OWNER_ROLE on vault = this factory)
+    function emergencyRescueToken(
+        address vault,
+        address token,
+        address to,
+        uint256 amount
+    ) external onlyRole(DIRAC_ADMIN_ROLE) {
+        if (!_isVault[vault]) revert Events.NotFactoryVault();
+        DiracVault(payable(vault)).emergencyRescueToken(token, to, amount);
     }
 
     // ============ View Functions ============

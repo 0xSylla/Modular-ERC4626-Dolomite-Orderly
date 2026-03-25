@@ -86,9 +86,9 @@ contract E2EFullCycle is Script {
         console.log("iBGT whitelisted");
 
         // --- 1f. Define Position ---
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
+        bytes32 orderlyModule = keccak256("perps.orderly");
 
         uint256 positionId = router.definePosition(
             vaultAddr,
@@ -108,7 +108,7 @@ contract E2EFullCycle is Script {
         // --- 1h. Init Dolomite Module (via router) ---
         router.executeModule(
             vaultAddr,
-            dolomiteModule,
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized");
@@ -116,7 +116,7 @@ contract E2EFullCycle is Script {
         // --- 1i. Init Orderly Module (via router) ---
         router.executeModule(
             vaultAddr,
-            orderlyModule,
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.initializeModule, (ORDERLY_VAULT))
         );
         console.log("Orderly module initialized");
@@ -129,7 +129,7 @@ contract E2EFullCycle is Script {
         });
         router.executeModule(
             vaultAddr,
-            orderlyModule,
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.delegateSigner, (delegateData))
         );
         console.log("Delegate signer set to:", deployer);
@@ -207,7 +207,7 @@ contract E2EFullCycle is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 swapAmount = IERC20(USDC).balanceOf(vaultAddr);
         console.log("=== Phase 3: Swap USDC -> iBGT ===");
@@ -225,7 +225,7 @@ contract E2EFullCycle is Script {
         vm.startBroadcast(pk);
         router.executeModule(
             vaultAddr,
-            kodiakModule,
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (USDC, false, swapAmount, IBGT, false, minAmountOut, swapData, feeData)
@@ -253,8 +253,8 @@ contract E2EFullCycle is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 orderlyModule = keccak256("perps.orderly");
 
         uint256 collateralAmount = vm.envUint("COLLATERAL_AMOUNT");
         uint256 borrowAmount = vm.envUint("BORROW_AMOUNT");
@@ -277,25 +277,25 @@ contract E2EFullCycle is Script {
         });
 
         // Build modules + datas arrays (in production, the API builds these from the strategy template)
-        address[] memory modules = new address[](3);
+        bytes32[] memory moduleTypes = new bytes32[](3);
         bytes[] memory datas = new bytes[](3);
 
         // Step 1: Supply collateral
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteLendingBase.supplyCollateral,
             (IBGT, collateralAmount, DIBGT_MARKET_ID)
         );
 
         // Step 2: Borrow USDC
-        modules[1] = dolomiteModule;
+        moduleTypes[1] = keccak256("lending.dolomite");
         datas[1] = abi.encodeCall(
             DolomiteLendingBase.borrow,
             (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
         );
 
         // Step 3: Deposit to Orderly
-        modules[2] = orderlyModule;
+        moduleTypes[2] = keccak256("perps.orderly");
         datas[2] = abi.encodeCall(
             OrderlyModule.deposit,
             (USDC, depositData, depositFee)
@@ -305,7 +305,7 @@ contract E2EFullCycle is Script {
 
         // Curator requests open, operator (API) fulfills with template-built modules + datas
         router.requestOpeningPosition(vaultAddr, 0);
-        router.executeOpeningRequest{value: depositFee}(vaultAddr, 0, modules, datas);
+        router.executeOpeningRequest{value: depositFee}(vaultAddr, 0, moduleTypes, datas);
         // In production, operator waits for Orderly deposit to settle + opens short off-chain
         // Then calls confirmOpen. Here we call it immediately for testing.
         router.confirmOpen(vaultAddr, 0);
@@ -340,7 +340,7 @@ contract E2EFullCycle is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 5: Close Strategy via Router ===");
         console.log("Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -359,11 +359,11 @@ contract E2EFullCycle is Script {
         console.log("minOut:", minUSDCOut);
 
         // Build modules + datas (in production, API builds these from strategy template)
-        address[] memory modules = new address[](1);
+        bytes32[] memory moduleTypes = new bytes32[](1);
         bytes[] memory datas = new bytes[](1);
 
         // Step 1: Repay debt with collateral zap (handles repay + withdraw in one call)
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteBeraModule.repayDebtWithCollateral,
             (IBGT, USDC, minUSDCOut, expectedUSDCOut, pathDefinition, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -371,7 +371,7 @@ contract E2EFullCycle is Script {
 
         vm.startBroadcast(pk);
         router.requestClosingPosition(vaultAddr, 0);
-        router.executeClosingRequest(vaultAddr, 0, modules, datas);
+        router.executeClosingRequest(vaultAddr, 0, moduleTypes, datas);
         vm.stopBroadcast();
 
         console.log("Strategy closed! (Debt repaid with collateral zap)");
@@ -393,7 +393,7 @@ contract E2EFullCycle is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 swapAmount = IERC20(IBGT).balanceOf(vaultAddr);
 
@@ -411,7 +411,7 @@ contract E2EFullCycle is Script {
         vm.startBroadcast(pk);
         router.executeModule(
             vaultAddr,
-            kodiakModule,
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (IBGT, false, swapAmount, USDC, false, minAmountOut, swapData, feeData)
@@ -485,25 +485,25 @@ contract E2EFullCycle is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Debug: executeBatch (supply+borrow) via router ===");
 
-        address[] memory modules = new address[](2);
+        bytes32[] memory moduleTypes = new bytes32[](2);
         bytes[] memory datas = new bytes[](2);
-        modules[0] = dolomiteModule;
+        moduleTypes[0] = keccak256("lending.dolomite");
         datas[0] = abi.encodeCall(
             DolomiteLendingBase.supplyCollateral,
             (IBGT, collateralAmount, DIBGT_MARKET_ID)
         );
-        modules[1] = dolomiteModule;
+        moduleTypes[1] = keccak256("lending.dolomite");
         datas[1] = abi.encodeCall(
             DolomiteLendingBase.borrow,
             (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
         );
 
         vm.startBroadcast(pk);
-        router.executeBatch(vaultAddr, modules, datas);
+        router.executeBatch(vaultAddr, moduleTypes, datas);
         vm.stopBroadcast();
 
         console.log("Batch succeeded!");

@@ -91,7 +91,7 @@ contract E2EOrderlyTest is Script {
         vault.startTrading();
 
         vault.executeModule(
-            address(orderlyModule),
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.initializeModule, (ORDERLY_VAULT))
         );
         console.log("Orderly module initialized with vault:", ORDERLY_VAULT);
@@ -109,7 +109,7 @@ contract E2EOrderlyTest is Script {
         });
 
         vault.executeModule(
-            address(orderlyModule),
+            keccak256("perps.orderly"),
             abi.encodeCall(OrderlyModule.delegateSigner, (delegateData))
         );
         console.log("Delegate signer set to:", deployer);
@@ -146,7 +146,7 @@ contract E2EOrderlyTest is Script {
         console.log("Deposit fee (BERA):", depositFee);
 
         vault.executeModule{value: depositFee}(
-            address(orderlyModule),
+            keccak256("perps.orderly"),
             abi.encodeCall(
                 OrderlyModule.deposit,
                 (USDC, depositData, depositFee)

@@ -5,13 +5,18 @@ import {Data} from "../libraries/Data.sol";
 
 interface IDiracVault {
     // ============ Module Execution ============
+    function setupModule(
+        bytes32 moduleType,
+        bytes calldata data
+    ) external returns (bytes memory);
+
     function executeModule(
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external payable returns (bytes memory);
 
     function executeBatch(
-        address[] calldata modules,
+        bytes32[] calldata moduleTypes,
         bytes[] calldata datas
     ) external payable returns (bytes[] memory);
 
@@ -31,11 +36,17 @@ interface IDiracVault {
     function unpause() external;
     function emergencyEndCycle() external;
     function emergencyExecuteModule(
-        address module,
+        bytes32 moduleType,
         bytes calldata data
     ) external payable returns (bytes memory);
+    function emergencyRescueToken(
+        address token,
+        address to,
+        uint256 amount
+    ) external;
 
     // ============ View ============
     function getCurrentCycle() external view returns (Data.TradeCycle memory);
     function isTargetAssetWhitelisted(address asset) external view returns (bool);
+    function isModuleTypeWhitelisted(bytes32 moduleType) external view returns (bool);
 }

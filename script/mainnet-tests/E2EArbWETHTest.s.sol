@@ -45,12 +45,12 @@ contract E2EArbWETHTest is Script {
         address factoryAddr = vm.envAddress("FACTORY_ADDR");
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 1: Create Vault (Arbitrum WETH) ===");
         console.log("Deployer:", deployer);
         console.log("Factory:", factoryAddr);
-        console.log("DolomiteModule:", dolomiteModule);
+        console.log("DolomiteModule type hash set");
         console.log("Deployer USDC:", IERC20(USDC).balanceOf(deployer));
 
         vm.startBroadcast(pk);
@@ -133,8 +133,8 @@ contract E2EArbWETHTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address odosModule     = factory.getModule(keccak256("swap.odos"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 odosModule = keccak256("swap.odos");
 
         uint256 swapAmount   = IERC20(USDC).balanceOf(vaultAddr);
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(350_000)); // 0.35 USDC
@@ -190,8 +190,8 @@ contract E2EArbWETHTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address odosModule     = factory.getModule(keccak256("swap.odos"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 odosModule = keccak256("swap.odos");
 
         console.log("=== Phase 4: Repay + Swap WETH -> USDC + Withdraw ===");
         console.log("Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));

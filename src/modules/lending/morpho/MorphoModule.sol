@@ -26,8 +26,8 @@ contract MorphoModule is ModuleBase {
 
     // ============ Arbitrum Constants ============
 
-    /// @notice Morpho Blue on Arbitrum
-    IMorpho public constant MORPHO = IMorpho(0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb);
+    /// @notice Morpho Blue on Arbitrum (different from Ethereum mainnet address)
+    IMorpho public constant MORPHO = IMorpho(0x6c247b1F6182318877311737BaC0844bAa518F5e);
 
     /// @notice Odos Router V2 on Arbitrum (for repayDebtWithCollateral swaps)
     address public constant ODOS_ROUTER = 0xa669e7A0d4b3e4Fa48af2dE86BD4CD7126Be4e13;
@@ -161,12 +161,26 @@ contract MorphoModule is ModuleBase {
 
         bytes32 marketId = _marketId(params);
 
-        uint256 repayAmount = _amount;
-        uint256 available = IERC20(borrowAsset).balanceOf(address(this));
-        if (available < repayAmount) repayAmount = available;
+        uint256 actualRepaid;
 
-        IERC20(borrowAsset).forceApprove(address(MORPHO), repayAmount);
-        (uint256 actualRepaid, ) = MORPHO.repay(params, repayAmount, 0, address(this), "");
+        if (_amount == type(uint256).max) {
+            // Full repay: use share-based mode to avoid overflow
+            // Read borrow shares from Morpho
+            (, uint128 borrowShares, ) = MORPHO.position(marketId, address(this));
+            if (borrowShares == 0) return; // nothing to repay
+
+            // Approve generous amount (Morpho will only take what's needed)
+            uint256 available = IERC20(borrowAsset).balanceOf(address(this));
+            IERC20(borrowAsset).forceApprove(address(MORPHO), available);
+            (actualRepaid, ) = MORPHO.repay(params, 0, borrowShares, address(this), "");
+        } else {
+            uint256 repayAmount = _amount;
+            uint256 available = IERC20(borrowAsset).balanceOf(address(this));
+            if (available < repayAmount) repayAmount = available;
+
+            IERC20(borrowAsset).forceApprove(address(MORPHO), repayAmount);
+            (actualRepaid, ) = MORPHO.repay(params, repayAmount, 0, address(this), "");
+        }
 
         if (s.assetBorrowed[marketId] >= actualRepaid) {
             s.assetBorrowed[marketId] -= actualRepaid;

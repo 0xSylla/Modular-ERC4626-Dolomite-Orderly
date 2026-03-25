@@ -41,7 +41,7 @@ contract E2EBorrowTestResume is Script {
         // ========================================
         console.log("\n--- Init Dolomite ---");
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized.");
@@ -59,7 +59,7 @@ contract E2EBorrowTestResume is Script {
         ) = _fetchKodiakQuote(USDC, IBGT, swapAmount, vaultAddr);
 
         vault.executeModule(
-            address(kodiakModule),
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (USDC, false, swapAmount, IBGT, false, minOut1, swapData1, feeData1)
@@ -75,7 +75,7 @@ contract E2EBorrowTestResume is Script {
         // ========================================
         console.log("\n--- Supply iBGT to Dolomite ---");
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.supplyCollateral,
                 (IBGT, type(uint256).max, DIBGT_MARKET_ID)
@@ -89,7 +89,7 @@ contract E2EBorrowTestResume is Script {
         console.log("\n--- Borrow 10000 USDC ---");
         uint256 borrowAmount = 10_000;
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.borrow,
                 (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -102,7 +102,7 @@ contract E2EBorrowTestResume is Script {
         // ========================================
         console.log("\n--- RepayDebt ---");
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.repayDebt,
                 (USDC, 0, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -117,7 +117,7 @@ contract E2EBorrowTestResume is Script {
         // ========================================
         console.log("\n--- Supply again + Borrow again ---");
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.supplyCollateral,
                 (IBGT, type(uint256).max, DIBGT_MARKET_ID)
@@ -125,7 +125,7 @@ contract E2EBorrowTestResume is Script {
         );
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.borrow,
                 (borrowAmount, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -145,7 +145,7 @@ contract E2EBorrowTestResume is Script {
         console.log("OogaBooga quote - expectedOut:", expectedUSDCOut, "minOut:", minUSDCOut);
 
         vault.executeModule(
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteBeraModule.repayDebtWithCollateral,
                 (IBGT, USDC, minUSDCOut, expectedUSDCOut, pathDefinition, DIBGT_MARKET_ID, USDC_MARKET_ID)
@@ -169,7 +169,7 @@ contract E2EBorrowTestResume is Script {
             ) = _fetchKodiakQuote(IBGT, USDC, remainingIbgt, vaultAddr);
 
             vault.executeModule(
-                address(kodiakModule),
+            keccak256("swap.kodiak"),
                 abi.encodeCall(
                     KodiakModule.swap,
                     (IBGT, false, type(uint256).max, USDC, false, minOut2, swapData2, feeData2)

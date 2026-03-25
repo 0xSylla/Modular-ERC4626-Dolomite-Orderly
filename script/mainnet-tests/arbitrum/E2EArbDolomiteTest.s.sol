@@ -135,7 +135,7 @@ contract E2EArbDolomiteTest is Script {
 
         router.executeModule(
             vaultAddr,
-            address(dolomiteModule),
+            keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.initializeModule, ())
         );
         console.log("Dolomite module initialized (Deposit/Withdrawal router authorized as operator).");
@@ -209,8 +209,8 @@ contract E2EArbDolomiteTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address odosModule = factory.getModule(keccak256("swap.odos"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 odosModule = keccak256("swap.odos");
 
         uint256 swapAmount = IERC20(USDC).balanceOf(vaultAddr);
         // Borrow ~50% of deposited value back. Default 500_000 (0.5 USDC).
@@ -232,7 +232,7 @@ contract E2EArbDolomiteTest is Script {
         // --- Step 1: Swap USDC → WETH ---
         router.executeModule(
             vaultAddr,
-            odosModule,
+            keccak256("swap.odos"),
             abi.encodeCall(OdosModule.swap, (USDC, swapAmount, WETH, minAmountOut, odosCalldata))
         );
         console.log("Vault WETH after swap:", IERC20(WETH).balanceOf(vaultAddr));
@@ -240,7 +240,7 @@ contract E2EArbDolomiteTest is Script {
         // --- Step 2: Supply all WETH to Dolomite ---
         router.executeModule(
             vaultAddr,
-            dolomiteModule,
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.supplyCollateral,
                 (WETH, type(uint256).max, WETH_MARKET_ID)
@@ -251,7 +251,7 @@ contract E2EArbDolomiteTest is Script {
         // --- Step 3: Borrow half the deposited value back in USDC ---
         router.executeModule(
             vaultAddr,
-            dolomiteModule,
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.borrow,
                 (borrowAmount, WETH_MARKET_ID, USDC_MARKET_ID)
@@ -285,8 +285,8 @@ contract E2EArbDolomiteTest is Script {
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
         UserRouter userRouter = UserRouter(userRouterAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address odosModule = factory.getModule(keccak256("swap.odos"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 odosModule = keccak256("swap.odos");
 
         // 0 = auto-calculate (107% of borrowed to cover accrued interest)
         uint256 repayAmount = vm.envOr("ARB_REPAY_AMOUNT", uint256(0));
@@ -318,7 +318,7 @@ contract E2EArbDolomiteTest is Script {
         // which sends WETH back to the vault.
         router.executeModule(
             vaultAddr,
-            dolomiteModule,
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.repayDebt,
                 (USDC, repayAmount, WETH_MARKET_ID, USDC_MARKET_ID)
@@ -330,7 +330,7 @@ contract E2EArbDolomiteTest is Script {
         uint256 wethBalance = IERC20(WETH).balanceOf(vaultAddr);
         router.executeModule(
             vaultAddr,
-            odosModule,
+            keccak256("swap.odos"),
             abi.encodeCall(OdosModule.swap, (WETH, wethBalance, USDC, minUSDCOut, odosCalldata))
         );
         console.log("WETH swapped to USDC. Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -370,8 +370,8 @@ contract E2EArbDolomiteTest is Script {
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
         UserRouter userRouter = UserRouter(userRouterAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address odosModule = factory.getModule(keccak256("swap.odos"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 odosModule = keccak256("swap.odos");
 
         console.log("=== Phase 5: Re-deposit + Supply + Borrow ===");
 
@@ -397,7 +397,7 @@ contract E2EArbDolomiteTest is Script {
 
         // Swap USDC → WETH
         router.executeModule(
-            vaultAddr, odosModule,
+            vaultAddr, keccak256("swap.odos"),
             abi.encodeCall(OdosModule.swap, (USDC, swapAmount, WETH, minAmountOut, odosCalldata))
         );
         uint256 wethBal = IERC20(WETH).balanceOf(vaultAddr);
@@ -405,13 +405,13 @@ contract E2EArbDolomiteTest is Script {
 
         // Supply WETH
         router.executeModule(
-            vaultAddr, dolomiteModule,
+            vaultAddr, keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.supplyCollateral, (WETH, type(uint256).max, WETH_MARKET_ID))
         );
 
         // Borrow USDC
         router.executeModule(
-            vaultAddr, dolomiteModule,
+            vaultAddr, keccak256("lending.dolomite"),
             abi.encodeCall(DolomiteLendingBase.borrow, (borrowAmount, WETH_MARKET_ID, USDC_MARKET_ID))
         );
 
@@ -436,7 +436,7 @@ contract E2EArbDolomiteTest is Script {
         VaultCuratorRouter router = VaultCuratorRouter(routerAddr);
         UserRouter userRouter = UserRouter(userRouterAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 6: repayDebtWithCollateral ===");
         console.log("Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -456,7 +456,7 @@ contract E2EArbDolomiteTest is Script {
         // Call repayDebtWithCollateral — withdraws collateral, swaps via Odos, repays debt
         router.executeModule(
             vaultAddr,
-            dolomiteModule,
+            keccak256("lending.dolomite"),
             abi.encodeCall(
                 DolomiteLendingBase.repayDebtWithCollateral,
                 (WETH, USDC, minUSDCOut, 0, odosCalldata, WETH_MARKET_ID, USDC_MARKET_ID)

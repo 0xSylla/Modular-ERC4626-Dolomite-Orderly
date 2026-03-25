@@ -43,7 +43,7 @@ contract E2ESingleVaultDualTest is Script {
         address factoryAddr = vm.envAddress("FACTORY_ADDR");
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 1: Create Single Vault (Dual Position) ===");
         console.log("Deployer:", deployer);
@@ -114,8 +114,8 @@ contract E2ESingleVaultDualTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         console.log("=== Phase 2: Swap + Supply + Borrow (Both Positions) ===");
         console.log("Vault USDC:", IERC20(USDC).balanceOf(vaultAddr));
@@ -199,8 +199,8 @@ contract E2ESingleVaultDualTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         // Estimates for swap quotes (collateral amounts returned from Dolomite)
         uint256 ibgtEstimate = vm.envOr("IBGT_COLLATERAL_ESTIMATE", uint256(0));

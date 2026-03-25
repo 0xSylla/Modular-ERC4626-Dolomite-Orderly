@@ -13,7 +13,11 @@ contract ConfigureNewModules is Script {
     address constant ARB_USDC   = 0xaf88d065e77c8cC2239327C5EDb3A432268e5831;
     address constant ARB_WBTC   = 0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f;
     address constant ARB_WETH   = 0x82aF49447D8a07e3bd95BD0d56f35241523fBab1;
-    address constant ARB_WSTETH = 0x5979d7B546E38E9Ab8B0d483b5C0c2C99b27C399;
+    address constant ARB_WSTETH = 0x5979D7b546E38E414F7E9822514be443A4800529;
+    // Morpho wstETH/USDC market params
+    address constant MORPHO_WSTETH_ORACLE = 0x8e02a9b9Cc29d783b2fCB71C3a72651B591cae31;
+    address constant MORPHO_WSTETH_IRM    = 0x66F30587FB8D4206918deb78ecA7d5eBbafD06DA;
+    uint256 constant MORPHO_WSTETH_LLTV   = 860000000000000000; // 86%
 
     function run() external {
         uint256 deployerPrivateKey = vm.envOr("PRIVATE_KEY", uint256(0));
@@ -55,13 +59,13 @@ contract ConfigureNewModules is Script {
         // The executor decodes this to build the correct calldata
         console.log("--- Configure Morpho lending ---");
         factory.setModuleLendingConfig(morphoTypeHash, ARB_WSTETH, abi.encode(
-            ARB_USDC,    // loanToken (what we borrow)
-            ARB_WSTETH,  // collateralToken
-            address(0),  // oracle — TODO: set actual Morpho oracle address
-            address(0),  // irm    — TODO: set actual Morpho IRM address
-            uint256(0)   // lltv   — TODO: set actual LLTV (e.g. 860000000000000000 for 86%)
+            ARB_USDC,              // loanToken (what we borrow)
+            ARB_WSTETH,            // collateralToken
+            MORPHO_WSTETH_ORACLE,  // oracle
+            MORPHO_WSTETH_IRM,     // irm
+            MORPHO_WSTETH_LLTV     // lltv (86%)
         ));
-        console.log("Morpho config set for wstETH (oracle/irm/lltv placeholder - update when known)");
+        console.log("Morpho config set for wstETH (oracle/irm/lltv: 86%)");
 
         vm.stopBroadcast();
 

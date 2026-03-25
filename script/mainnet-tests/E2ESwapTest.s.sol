@@ -105,7 +105,7 @@ contract E2ESwapTest is Script {
         vm.startBroadcast(pk);
 
         vault.executeModule(
-            address(kodiakModule),
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (USDC, false, depositAmount, IBGT, false, minOut1, swapData1, feeData1)
@@ -134,7 +134,7 @@ contract E2ESwapTest is Script {
         vm.startBroadcast(pk);
 
         vault.executeModule(
-            address(kodiakModule),
+            keccak256("swap.kodiak"),
             abi.encodeCall(
                 KodiakModule.swap,
                 (IBGT, false, ibgtBalance, USDC, false, minOut2, swapData2, feeData2)

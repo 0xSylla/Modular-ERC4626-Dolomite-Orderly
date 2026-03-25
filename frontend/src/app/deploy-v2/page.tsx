@@ -13,19 +13,20 @@ import { parseUnits, keccak256, encodePacked, toBytes } from "viem";
 import { useAddresses, factoryAbi, vaultAbi, curatorRouterAbi } from "@/lib/contracts";
 import { useBrowsingChain } from "@/lib/ChainContext";
 import { initializeVault } from "@/lib/api";
+import dynamic from "next/dynamic";
+
+const BacktestEquityChart = dynamic(() => import("@/components/BacktestEquityChart"), { ssr: false });
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
 /* -------------------------------------------------------------------------- */
 
-type Step = "strategy" | "configure" | "review" | "deploying" | "success";
+type Step = "strategy" | "configure" | "review";
 
 const STEPS: { key: Step; label: string }[] = [
   { key: "strategy",  label: "Strategy" },
   { key: "configure", label: "Configure" },
-  { key: "review",    label: "Review" },
-  { key: "deploying", label: "Deploying" },
-  { key: "success",   label: "Complete" },
+  { key: "review",    label: "Review & Deploy" },
 ];
 
 /* -------------------------------------------------------------------------- */
@@ -113,8 +114,10 @@ export default function DeployV2Page() {
   const [selectedSwapAddr,    setSelectedSwapAddr]    = useState("");
   const [selectedLendingAddr, setSelectedLendingAddr] = useState("");
   const [selectedPerpsAddr,   setSelectedPerpsAddr]   = useState("");
-  const [maxLtv, setMaxLtv]                           = useState("70");
-  const [fundingRateThreshold, setFundingRateThreshold] = useState("0.01");
+  const [rebalanceThreshold, setRebalanceThreshold]   = useState(25);
+  const [execMode, setExecMode]                       = useState<"cex" | "dex">("dex");
+  const [fundingFilterOn, setFundingFilterOn]           = useState(false);
+  const [fundingSlider, setFundingSlider]             = useState(50);
 
   // Deploy state
   const [deployedVault, setDeployedVault]         = useState<`0x${string}` | null>(null);
@@ -124,12 +127,16 @@ export default function DeployV2Page() {
   const [orderlyInitStatus, setOrderlyInitStatus] = useState<null | "loading" | "success" | "failed">(null);
   const [orderlyInitError, setOrderlyInitError]   = useState<string | null>(null);
 
+  // Deploy modal
+  const [showDeployModal, setShowDeployModal] = useState(false);
+
   // Which config section is expanded
-  const [activeSection, setActiveSection] = useState<string>("vault");
+  const [openSections, setOpenSections] = useState<Set<string>>(new Set(["assets", "lending", "perps", "risk"]));
 
   useEffect(() => {
     setDepositToken(addresses.USDC);
-    setSelectedAssets(new Set());
+    const wstETH = addresses.strategyAssets.find((a) => a.label === "wstETH");
+    setSelectedAssets(wstETH ? new Set([wstETH.address]) : new Set());
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addresses.USDC]);
 
@@ -185,7 +192,10 @@ export default function DeployV2Page() {
 
   useEffect(() => {
     if (!selectedSwapAddr    && availableSwapModules[0])    setSelectedSwapAddr(availableSwapModules[0].address);
-    if (!selectedLendingAddr && availableLendingModules[0]) setSelectedLendingAddr(availableLendingModules[0].address);
+    if (!selectedLendingAddr && availableLendingModules.length > 0) {
+      const morpho = availableLendingModules.find((m) => m.key === "lending.morpho");
+      setSelectedLendingAddr(morpho ? morpho.address : availableLendingModules[0].address);
+    }
     if (!selectedPerpsAddr   && availablePerpsModules[0])   setSelectedPerpsAddr(availablePerpsModules[0].address);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleData]);
@@ -280,7 +290,7 @@ export default function DeployV2Page() {
 
   /* ---------------------- handle receipt ---------------------------------- */
   useEffect(() => {
-    if (!receipt || step !== "deploying") return;
+    if (!receipt || !showDeployModal) return;
 
     let vaultAddr = deployedVault;
 
@@ -306,14 +316,11 @@ export default function DeployV2Page() {
         initializeVault(chainId, vaultAddr, 2)
           .then(() => {
             setOrderlyInitStatus("success");
-            setStep("success");
           })
           .catch((err: Error) => {
             setOrderlyInitError(err?.message ?? "Orderly initialization failed");
             setOrderlyInitStatus("failed");
           });
-      } else {
-        setStep("success");
       }
     } else {
       setDeployingTxIdx(nextIdx);
@@ -332,7 +339,7 @@ export default function DeployV2Page() {
         return;
       }
     }
-    setStep("deploying");
+    setShowDeployModal(true);
     setDeployingTxIdx(0);
     setCompletedTxs(new Set());
     setDeployedVault(null);
@@ -354,8 +361,7 @@ export default function DeployV2Page() {
     curatorFeeBps <= 200 &&
     /^0x[a-fA-F0-9]{40}$/.test(feeRecipient);
 
-  const isRiskValid =
-    Number(maxLtv) > 0 && Number(maxLtv) <= 100 && Number(fundingRateThreshold) > 0;
+  const isRiskValid = rebalanceThreshold >= 1 && rebalanceThreshold <= 45;
 
   const isStep2Valid =
     isConfigValid && isFeesValid && selectedAssets.size > 0 && modulesValid && isRiskValid;
@@ -363,6 +369,9 @@ export default function DeployV2Page() {
   /* ----------------------------- helpers ---------------------------------- */
   const depositTokenLabel = DEPOSIT_TOKENS.find((t) => t.address === depositToken)?.label ?? "Unknown";
   const selectedTemplate  = TEMPLATES.find((t) => t.id === template);
+  const hasWstETH = Array.from(selectedAssets).some(
+    (addr) => COLLATERAL_ASSETS.find((a) => a.address === addr)?.label === "wstETH"
+  );
 
   function assetLabel(addr: string) {
     const known = COLLATERAL_ASSETS.find((a) => a.address === addr);
@@ -458,12 +467,211 @@ export default function DeployV2Page() {
             </div>
           </div>
 
+          {/* --- Underlying Asset (first position) --- */}
+          <AccordionSection
+            title="Underlying Asset"
+            subtitle={selectedAssets.size > 0 ? Array.from(selectedAssets).map(assetLabel).join(", ") : "Select underlying asset"}
+            isOpen={openSections.has("assets")}
+            onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("assets") ? n.delete("assets") : n.add("assets"); return n; })}
+            isValid={selectedAssets.size > 0}
+          >
+            <div className="flex flex-wrap gap-2">
+              {COLLATERAL_ASSETS.map((asset) => {
+                const isSelected = selectedAssets.has(asset.address);
+                const enabled = chainId !== 42161 || asset.label === "wstETH";
+                return (
+                  <button
+                    key={asset.address}
+                    onClick={() => enabled && toggleAsset(asset.address)}
+                    disabled={!enabled}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      !enabled ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed"
+                      : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                    }`}
+                  >
+                    <div className={`h-3.5 w-3.5 shrink-0 rounded border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
+                      {isSelected && (
+                        <svg className="h-2 w-2 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      )}
+                    </div>
+                    <span className={`text-sm font-medium ${enabled ? "text-white" : "text-[#818181]"}`}>{asset.label}</span>
+                  </button>
+                );
+              })}
+              {/* Extra greyed-out tokens */}
+              {["XRP", "HYPE"].map((label) => (
+                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed">
+                  <div className="h-3.5 w-3.5 shrink-0 rounded border-2 border-[#3C323A]" />
+                  <span className="text-sm font-medium text-[#818181]">{label}</span>
+                </button>
+              ))}
+            </div>
+          </AccordionSection>
+
+          {/* --- Lending Module (pill buttons) --- */}
+          <AccordionSection
+            title="Lending Module"
+            subtitle={moduleLabel(selectedLendingAddr)}
+            isOpen={openSections.has("lending")}
+            onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("lending") ? n.delete("lending") : n.add("lending"); return n; })}
+            isValid={selectedLendingAddr.length > 0}
+          >
+            <div className="flex flex-wrap gap-2">
+              {availableLendingModules.map((m) => {
+                const isSelected = selectedLendingAddr === m.address;
+                return (
+                  <button key={m.key} onClick={() => setSelectedLendingAddr(m.address)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                    }`}>
+                    <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
+                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-white">{m.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </AccordionSection>
+
+          {/* --- Perps Module (pill buttons) --- */}
+          <AccordionSection
+            title="Perps Module"
+            subtitle={moduleLabel(selectedPerpsAddr)}
+            isOpen={openSections.has("perps")}
+            onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("perps") ? n.delete("perps") : n.add("perps"); return n; })}
+            isValid={selectedPerpsAddr.length > 0}
+          >
+            <div className="flex flex-wrap gap-2">
+              {availablePerpsModules.map((m) => {
+                const isSelected = selectedPerpsAddr === m.address;
+                return (
+                  <button key={m.key} onClick={() => setSelectedPerpsAddr(m.address)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
+                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                    }`}>
+                    <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
+                      {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
+                    </div>
+                    <span className="text-sm font-medium text-white">{m.label}</span>
+                  </button>
+                );
+              })}
+              {["Hyperliquid", "GMX"].map((label) => (
+                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed">
+                  <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-[#3C323A]" />
+                  <span className="text-sm font-medium text-[#818181]">{label}</span>
+                </button>
+              ))}
+            </div>
+          </AccordionSection>
+
+
+          {/* --- Risk Parameters (before Vault Info when wstETH selected) --- */}
+          {hasWstETH && (
+            <AccordionSection
+              title="Risk Parameters"
+              subtitle={`Rebalance ${rebalanceThreshold}% | ${execMode.toUpperCase()}`}
+              isOpen={openSections.has("risk")}
+              onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("risk") ? n.delete("risk") : n.add("risk"); return n; })}
+              isValid={isRiskValid}
+            >
+              <div className="space-y-4">
+                {/* Rebalancing threshold slider */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs text-[#818181] uppercase tracking-wider">Rebalancing Threshold</label>
+                    <span className={`text-2xl font-bold font-mono ${
+                      rebalanceThreshold <= 10 ? "text-red-400" : rebalanceThreshold <= 20 ? "text-amber-400" : rebalanceThreshold <= 30 ? "text-blue-400" : "text-emerald-400"
+                    }`}>{rebalanceThreshold}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={1}
+                    max={45}
+                    value={rebalanceThreshold}
+                    onChange={(e) => setRebalanceThreshold(Number(e.target.value))}
+                    className="w-full accent-orange-500"
+                  />
+                  <div className="flex justify-between text-[10px] text-[#818181] mt-1 px-0.5">
+                    <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>45%</span>
+                  </div>
+                </div>
+
+                {/* Backtest chart + stats */}
+                <BacktestEquityChart threshold={rebalanceThreshold} execMode={execMode} fundingFilterOn={fundingFilterOn} fundingSlider={fundingSlider} />
+
+                {/* Toggles row below chart */}
+                <div className="flex items-center gap-4 flex-wrap">
+                  {/* CEX / DEX toggle */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#818181] uppercase tracking-wider">Execution</span>
+                    <div className="flex rounded-lg border border-[#3C323A] overflow-hidden">
+                      <button
+                        onClick={() => setExecMode("dex")}
+                        className={`px-3 py-1 text-xs font-medium font-mono transition-all ${
+                          execMode === "dex"
+                            ? "bg-[#ff4d4d]/15 text-[#ff4d4d]"
+                            : "bg-[#252525] text-[#818181] hover:text-white"
+                        }`}
+                      >DEX</button>
+                      <button
+                        onClick={() => setExecMode("cex")}
+                        className={`px-3 py-1 text-xs font-medium font-mono transition-all border-l border-[#3C323A] ${
+                          execMode === "cex"
+                            ? "bg-emerald-500/15 text-emerald-400"
+                            : "bg-[#252525] text-[#818181] hover:text-white"
+                        }`}
+                      >CEX</button>
+                    </div>
+                  </div>
+
+                  {/* Funding regime filter */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-[#818181] uppercase tracking-wider">Funding Filter</span>
+                    <button
+                      onClick={() => setFundingFilterOn(!fundingFilterOn)}
+                      className={`relative w-9 h-5 rounded-full transition-all ${
+                        fundingFilterOn ? "bg-amber-500" : "bg-[#3C323A]"
+                      }`}
+                    >
+                      <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                        fundingFilterOn ? "left-[18px]" : "left-0.5"
+                      }`} />
+                    </button>
+                    {fundingFilterOn && (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="range"
+                          min={0}
+                          max={100}
+                          value={fundingSlider}
+                          onChange={(e) => setFundingSlider(Number(e.target.value))}
+                          className="w-24 accent-amber-500"
+                        />
+                        <span className="text-[10px] text-amber-400 font-mono font-medium min-w-[40px]">
+                          {Math.round((fundingSlider / 100) * (-0.00033445) * 100000) / 10} bps
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+                  Backtest is historical — past performance does not guarantee future results. Parameters saved locally for the rebalancing bot.
+                </div>
+              </div>
+            </AccordionSection>
+          )}
+
           {/* --- Vault Info Section --- */}
           <AccordionSection
             title="Vault Info"
             subtitle={vaultName ? `${vaultName} (${vaultSymbol})` : "Name, symbol, deposit token"}
-            isOpen={activeSection === "vault"}
-            onToggle={() => setActiveSection(activeSection === "vault" ? "" : "vault")}
+            isOpen={openSections.has("vault")}
+            onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("vault") ? n.delete("vault") : n.add("vault"); return n; })}
             isValid={isConfigValid}
           >
             <Field label="Vault Name">
@@ -491,8 +699,8 @@ export default function DeployV2Page() {
           <AccordionSection
             title="Fees"
             subtitle={`Curator: ${(curatorFeeBps / 100).toFixed(2)}%${protocolFeeBps !== null && daoFeeBps !== null ? ` | Total: ${((protocolFeeBps + daoFeeBps + curatorFeeBps) / 100).toFixed(2)}%` : ""}`}
-            isOpen={activeSection === "fees"}
-            onToggle={() => setActiveSection(activeSection === "fees" ? "" : "fees")}
+            isOpen={openSections.has("fees")}
+            onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("fees") ? n.delete("fees") : n.add("fees"); return n; })}
             isValid={isFeesValid}
           >
             {/* Protocol fees info */}
@@ -529,87 +737,38 @@ export default function DeployV2Page() {
             </Field>
           </AccordionSection>
 
-          {/* --- Assets Section --- */}
-          <AccordionSection
-            title="Collateral Assets"
-            subtitle={selectedAssets.size > 0 ? Array.from(selectedAssets).map(assetLabel).join(", ") : "Select collateral assets"}
-            isOpen={activeSection === "assets"}
-            onToggle={() => setActiveSection(activeSection === "assets" ? "" : "assets")}
-            isValid={selectedAssets.size > 0}
-          >
-            <div className="space-y-2">
-              {COLLATERAL_ASSETS.map((asset) => {
-                const isSelected = selectedAssets.has(asset.address);
-                return (
-                  <button
-                    key={asset.address}
-                    onClick={() => toggleAsset(asset.address)}
-                    className={`w-full text-left p-3 rounded-lg border transition-all ${
-                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`h-4 w-4 shrink-0 rounded border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
-                        {isSelected && (
-                          <svg className="h-2.5 w-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                          </svg>
-                        )}
-                      </div>
-                      <span className="text-sm font-medium text-white">{asset.label}</span>
-                      <span className="font-mono text-xs text-[#818181]">
-                        {asset.address.slice(0, 6)}...{asset.address.slice(-4)}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </AccordionSection>
 
-          {/* --- Modules Section --- */}
-          <AccordionSection
-            title="Strategy Modules"
-            subtitle={modulesValid ? `${moduleLabel(selectedSwapAddr)} / ${moduleLabel(selectedLendingAddr)} / ${moduleLabel(selectedPerpsAddr)}` : "Select modules for each leg"}
-            isOpen={activeSection === "modules"}
-            onToggle={() => setActiveSection(activeSection === "modules" ? "" : "modules")}
-            isValid={modulesValid}
-          >
-            <div className="space-y-3">
-              <ModuleSelector leg="Swap" description="Swaps deposit token into collateral."
-                options={availableSwapModules} value={selectedSwapAddr} onChange={setSelectedSwapAddr} />
-              <ModuleSelector leg="Lending" description="Supplies collateral and borrows stablecoins."
-                options={availableLendingModules} value={selectedLendingAddr} onChange={setSelectedLendingAddr} />
-              <ModuleSelector leg="Perps" description="Opens short to hedge collateral exposure."
-                options={availablePerpsModules} value={selectedPerpsAddr} onChange={setSelectedPerpsAddr} />
-            </div>
-          </AccordionSection>
-
-          {/* --- Risk Section --- */}
-          <AccordionSection
-            title="Risk Parameters"
-            subtitle={`LTV ${maxLtv}% | Funding ${fundingRateThreshold}%`}
-            isOpen={activeSection === "risk"}
-            onToggle={() => setActiveSection(activeSection === "risk" ? "" : "risk")}
-            isValid={isRiskValid}
-          >
-            <Field label={`Max LTV: ${maxLtv}%`}>
-              <input type="range" min={10} max={90} step={1} value={maxLtv}
-                onChange={(e) => setMaxLtv(e.target.value)} className="w-full accent-orange-500" />
-              <div className="flex justify-between text-xs text-[#818181] mt-1">
-                <span>10%</span><span>50%</span><span>90%</span>
+          {/* --- Risk Section (non-wstETH fallback) --- */}
+          {!hasWstETH && (
+            <AccordionSection
+              title="Risk Parameters"
+              subtitle={`Rebalance ${rebalanceThreshold}%`}
+              isOpen={openSections.has("risk")}
+              onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("risk") ? n.delete("risk") : n.add("risk"); return n; })}
+              isValid={isRiskValid}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs text-[#818181] uppercase tracking-wider">Rebalancing Threshold</label>
+                  <span className="text-lg font-bold font-mono text-white">{rebalanceThreshold}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={1}
+                  max={45}
+                  value={rebalanceThreshold}
+                  onChange={(e) => setRebalanceThreshold(Number(e.target.value))}
+                  className="w-full accent-orange-500"
+                />
+                <div className="flex justify-between text-[10px] text-[#818181] mt-1">
+                  <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>45%</span>
+                </div>
               </div>
-            </Field>
-
-            <Field label={`Funding Rate Threshold: ${fundingRateThreshold}%`}>
-              <input type="number" min="0.001" step="0.001" value={fundingRateThreshold}
-                onChange={(e) => setFundingRateThreshold(e.target.value)} placeholder="0.01" className={inputClass} />
-            </Field>
-
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
-              Saved locally for the rebalancing bot. Not stored on-chain.
-            </div>
-          </AccordionSection>
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-xs text-amber-300">
+                Saved locally for the rebalancing bot. Not stored on-chain.
+              </div>
+            </AccordionSection>
+          )}
 
           {/* Nav */}
           <div className="flex justify-between pt-2">
@@ -639,8 +798,8 @@ export default function DeployV2Page() {
             <SummaryRow label="Swap Module"    value={moduleLabel(selectedSwapAddr)} />
             <SummaryRow label="Lending Module" value={moduleLabel(selectedLendingAddr)} />
             <SummaryRow label="Perps Module"   value={moduleLabel(selectedPerpsAddr)} />
-            <SummaryRow label="Max LTV"                 value={`${maxLtv}%`} />
-            <SummaryRow label="Funding Rate Threshold"  value={`${fundingRateThreshold}%`} />
+            <SummaryRow label="Rebalancing Threshold" value={`${rebalanceThreshold}%`} />
+            <SummaryRow label="Execution Mode" value={execMode.toUpperCase()} />
           </div>
 
           <div className="rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-3 text-sm text-blue-300">
@@ -657,169 +816,36 @@ export default function DeployV2Page() {
         </div>
       )}
 
-      {/* ========================== DEPLOYING =============================== */}
-      {step === "deploying" && (
-        <div className="p-6 rounded-xl bg-[#252525]/60 border border-[#3C323A] space-y-6">
-          <div className="text-center space-y-2">
-            <h2 className="text-lg font-semibold text-white">Deploying Your Vault</h2>
-            <p className="text-sm text-[#818181]">Sign each transaction in your wallet. Do not close this page.</p>
-          </div>
-
-          <div className="space-y-2">
-            {txQueue.map((tx, i) => {
-              const isDone    = completedTxs.has(i);
-              const isCurrent = i === deployingTxIdx;
-              const isPending = i > deployingTxIdx;
-
-              return (
-                <div key={i} className={`flex items-center gap-4 px-4 py-3 rounded-lg border transition-all ${
-                  isDone    ? "border-emerald-500/40 bg-emerald-500/10"
-                  : isCurrent ? "border-[#FB5F07]/60 bg-[#FB5F07]/10"
-                  : "border-[#3C323A] bg-[#252525]/40 opacity-50"
-                }`}>
-                  <div className="shrink-0">
-                    {isDone ? (
-                      <div className="h-7 w-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                        </svg>
-                      </div>
-                    ) : isCurrent ? (
-                      <div className="h-7 w-7 rounded-full border-2 border-[#FB5F07] border-t-transparent animate-spin" />
-                    ) : (
-                      <div className="h-7 w-7 rounded-full bg-[#252525] flex items-center justify-center text-xs font-bold text-[#818181]">
-                        {i + 1}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1">
-                    <p className={`text-sm font-medium ${isDone ? "text-emerald-300" : isCurrent ? "text-white" : "text-[#818181]"}`}>
-                      {tx.label}
-                    </p>
-                    {isCurrent && (
-                      <p className="text-xs text-[#FB5F07] mt-0.5">
-                        {isSigning ? "Waiting for wallet signature…" : isConfirming ? "Confirming on-chain…" : "Starting…"}
-                      </p>
-                    )}
-                    {isDone && <p className="text-xs text-emerald-400 mt-0.5">Confirmed</p>}
-                  </div>
-                  {isCurrent && !isSigning && !isConfirming && !writeError && (
-                    <button onClick={() => startTx(i, deployedVault)}
-                      className="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">Sign</button>
-                  )}
-                  {isPending && <span className="text-xs text-[#818181] shrink-0">Pending</span>}
-                </div>
-              );
-            })}
-
-            {/* Orderly init step */}
-            {isOrderlyPerps && (
-              <div className={`flex items-center gap-4 px-4 py-3 rounded-lg border transition-all ${
-                orderlyInitStatus === "success" ? "border-emerald-500/40 bg-emerald-500/10"
-                : orderlyInitStatus === "failed"  ? "border-red-500/40 bg-red-500/10"
-                : orderlyInitStatus === "loading" ? "border-[#FB5F07]/60 bg-[#FB5F07]/10"
-                : "border-[#3C323A] bg-[#252525]/40 opacity-50"
-              }`}>
-                <div className="shrink-0">
-                  {orderlyInitStatus === "success" ? (
-                    <div className="h-7 w-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                  ) : orderlyInitStatus === "failed" ? (
-                    <div className="h-7 w-7 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </div>
-                  ) : orderlyInitStatus === "loading" ? (
-                    <div className="h-7 w-7 rounded-full border-2 border-[#FB5F07] border-t-transparent animate-spin" />
-                  ) : (
-                    <div className="h-7 w-7 rounded-full bg-[#252525] flex items-center justify-center text-xs font-bold text-[#818181]">
-                      {txQueue.length + 1}
-                    </div>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className={`text-sm font-medium ${
-                    orderlyInitStatus === "success" ? "text-emerald-300"
-                    : orderlyInitStatus === "failed"  ? "text-red-300"
-                    : orderlyInitStatus === "loading" ? "text-white"
-                    : "text-[#818181]"
-                  }`}>Initialize Vault on Orderly</p>
-                  {orderlyInitStatus === "loading" && <p className="text-xs text-[#FB5F07] mt-0.5">Registering vault with Orderly API…</p>}
-                  {orderlyInitStatus === "success" && <p className="text-xs text-emerald-400 mt-0.5">Confirmed</p>}
-                  {orderlyInitStatus === "failed" && orderlyInitError && <p className="text-xs text-red-400 mt-0.5 break-all">{orderlyInitError}</p>}
-                </div>
-                {orderlyInitStatus === "failed" && (
-                  <button onClick={() => {
-                    if (!deployedVault) return;
-                    setOrderlyInitStatus("loading");
-                    setOrderlyInitError(null);
-                    initializeVault(chainId, deployedVault, 2)
-                      .then(() => { setOrderlyInitStatus("success"); setStep("success"); })
-                      .catch((err: Error) => {
-                        setOrderlyInitError(err?.message ?? "Orderly initialization failed");
-                        setOrderlyInitStatus("failed");
-                      });
-                  }} className="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">Retry</button>
-                )}
-                {!orderlyInitStatus && <span className="text-xs text-[#818181] shrink-0">Pending</span>}
-              </div>
-            )}
-          </div>
-
-          {(writeError || parseError) && (
-            <div className="p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm space-y-2">
-              <p className="break-all">{writeError?.message?.slice(0, 300) ?? parseError}</p>
-              <button onClick={() => { resetWrite(); setParseError(null); }}
-                className="text-[#FB5F07] hover:text-orange-300 underline text-xs">
-                Retry transaction {deployingTxIdx + 1}
-              </button>
-            </div>
-          )}
-
-          <p className="text-center text-xs text-[#818181]">
-            {completedTxs.size} of {txQueue.length} transactions confirmed
-          </p>
-        </div>
-      )}
-
-      {/* ========================== SUCCESS ================================= */}
-      {step === "success" && deployedVault && (
-        <div className="p-6 rounded-xl bg-[#252525]/60 border border-[#3C323A] flex flex-col items-center justify-center gap-5 py-16">
-          <div className="flex items-center justify-center h-16 w-16 rounded-full bg-green-900/40 border-2 border-green-500">
-            <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-
-          <h2 className="text-xl font-bold text-white">Vault Setup Complete</h2>
-          <p className="text-[#818181] text-sm font-mono break-all max-w-lg text-center">{deployedVault}</p>
-
-          <div className="flex flex-wrap gap-2 justify-center">
-            {Array.from(selectedAssets).map((addr) => (
-              <span key={addr} className="inline-block rounded-full border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-400">
-                {assetLabel(addr)} whitelisted
-              </span>
-            ))}
-            <span className="inline-block rounded-full border border-[#FB5F07]/40 bg-[#FB5F07]/20 px-3 py-1 text-xs font-medium text-[#FB5F07]">
-              Modules configured
-            </span>
-            {isOrderlyPerps && (
-              <span className="inline-block rounded-full border border-blue-500/40 bg-blue-500/20 px-3 py-1 text-xs font-medium text-blue-400">
-                Orderly initialized
-              </span>
-            )}
-          </div>
-
-          <div className="flex gap-4 pt-2">
-            <Link href={`/manage/${deployedVault}`} className="btn-primary px-6 py-2.5 rounded-lg font-medium text-center">Manage Vault</Link>
-            <Link href={`/vault/${deployedVault}`} className="btn-secondary px-6 py-2.5 rounded-lg font-medium text-center">View Vault</Link>
-          </div>
-        </div>
-      )}
+      {/* ========================== DEPLOY MODAL ============================ */}
+      {showDeployModal && <DeployModal
+        txQueue={txQueue}
+        deployingTxIdx={deployingTxIdx}
+        completedTxs={completedTxs}
+        isSigning={isSigning}
+        isConfirming={isConfirming}
+        writeError={writeError}
+        parseError={parseError}
+        deployedVault={deployedVault}
+        isOrderlyPerps={isOrderlyPerps}
+        orderlyInitStatus={orderlyInitStatus}
+        orderlyInitError={orderlyInitError}
+        selectedAssets={selectedAssets}
+        assetLabel={assetLabel}
+        chainId={chainId}
+        onRetryTx={(idx) => startTx(idx, deployedVault)}
+        onResetError={() => { resetWrite(); setParseError(null); }}
+        onRetryOrderly={() => {
+          if (!deployedVault) return;
+          setOrderlyInitStatus("loading");
+          setOrderlyInitError(null);
+          initializeVault(chainId, deployedVault, 2)
+            .then(() => { setOrderlyInitStatus("success"); })
+            .catch((err: Error) => {
+              setOrderlyInitError(err?.message ?? "Orderly initialization failed");
+              setOrderlyInitStatus("failed");
+            });
+        }}
+      />}
     </div>
   );
 }
@@ -944,6 +970,201 @@ function ModuleSelector({
           ))}
         </select>
       )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*                            Deploy Modal                                 */
+/* ---------------------------------------------------------------------- */
+
+function DeployModal({
+  txQueue, deployingTxIdx, completedTxs, isSigning, isConfirming,
+  writeError, parseError, deployedVault, isOrderlyPerps,
+  orderlyInitStatus, orderlyInitError, selectedAssets, assetLabel,
+  chainId, onRetryTx, onResetError, onRetryOrderly,
+}: {
+  txQueue: { label: string; description: string }[];
+  deployingTxIdx: number;
+  completedTxs: Set<number>;
+  isSigning: boolean;
+  isConfirming: boolean;
+  writeError: Error | null;
+  parseError: string | null;
+  deployedVault: `0x${string}` | null;
+  isOrderlyPerps: boolean;
+  orderlyInitStatus: null | "loading" | "success" | "failed";
+  orderlyInitError: string | null;
+  selectedAssets: Set<string>;
+  assetLabel: (addr: string) => string;
+  chainId: number;
+  onRetryTx: (idx: number) => void;
+  onResetError: () => void;
+  onRetryOrderly: () => void;
+}) {
+  const allTxsDone = completedTxs.size >= txQueue.length;
+  const isComplete = allTxsDone && (!isOrderlyPerps || orderlyInitStatus === "success") && !!deployedVault;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" />
+
+      {/* Modal */}
+      <div className="relative w-full max-w-lg mx-4 rounded-2xl border border-[#3C323A] bg-[#1a1a1a] shadow-2xl overflow-hidden">
+        {!isComplete ? (
+          /* ── Deploying state ── */
+          <div className="p-6 space-y-5">
+            <div className="text-center space-y-1">
+              <h2 className="text-lg font-semibold text-white">Deploying Your Vault</h2>
+              <p className="text-sm text-[#818181]">Sign each transaction in your wallet.</p>
+            </div>
+
+            <div className="space-y-2 max-h-[50vh] overflow-y-auto">
+              {txQueue.map((tx, i) => {
+                const isDone    = completedTxs.has(i);
+                const isCurrent = i === deployingTxIdx;
+                const isPending = i > deployingTxIdx;
+
+                return (
+                  <div key={i} className={`flex items-center gap-4 px-4 py-3 rounded-lg border transition-all ${
+                    isDone    ? "border-emerald-500/40 bg-emerald-500/10"
+                    : isCurrent ? "border-[#FB5F07]/60 bg-[#FB5F07]/10"
+                    : "border-[#3C323A] bg-[#252525]/40 opacity-50"
+                  }`}>
+                    <div className="shrink-0">
+                      {isDone ? (
+                        <div className="h-7 w-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                          <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      ) : isCurrent ? (
+                        <div className="h-7 w-7 rounded-full border-2 border-[#FB5F07] border-t-transparent animate-spin" />
+                      ) : (
+                        <div className="h-7 w-7 rounded-full bg-[#252525] flex items-center justify-center text-xs font-bold text-[#818181]">
+                          {i + 1}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <p className={`text-sm font-medium ${isDone ? "text-emerald-300" : isCurrent ? "text-white" : "text-[#818181]"}`}>
+                        {tx.label}
+                      </p>
+                      {isCurrent && (
+                        <p className="text-xs text-[#FB5F07] mt-0.5">
+                          {isSigning ? "Waiting for wallet signature…" : isConfirming ? "Confirming on-chain…" : "Starting…"}
+                        </p>
+                      )}
+                      {isDone && <p className="text-xs text-emerald-400 mt-0.5">Confirmed</p>}
+                    </div>
+                    {isCurrent && !isSigning && !isConfirming && !writeError && (
+                      <button onClick={() => onRetryTx(i)}
+                        className="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">Sign</button>
+                    )}
+                    {isPending && <span className="text-xs text-[#818181] shrink-0">Pending</span>}
+                  </div>
+                );
+              })}
+
+              {/* Orderly init step */}
+              {isOrderlyPerps && (
+                <div className={`flex items-center gap-4 px-4 py-3 rounded-lg border transition-all ${
+                  orderlyInitStatus === "success" ? "border-emerald-500/40 bg-emerald-500/10"
+                  : orderlyInitStatus === "failed"  ? "border-red-500/40 bg-red-500/10"
+                  : orderlyInitStatus === "loading" ? "border-[#FB5F07]/60 bg-[#FB5F07]/10"
+                  : "border-[#3C323A] bg-[#252525]/40 opacity-50"
+                }`}>
+                  <div className="shrink-0">
+                    {orderlyInitStatus === "success" ? (
+                      <div className="h-7 w-7 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    ) : orderlyInitStatus === "failed" ? (
+                      <div className="h-7 w-7 rounded-full bg-red-500/20 flex items-center justify-center">
+                        <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </div>
+                    ) : orderlyInitStatus === "loading" ? (
+                      <div className="h-7 w-7 rounded-full border-2 border-[#FB5F07] border-t-transparent animate-spin" />
+                    ) : (
+                      <div className="h-7 w-7 rounded-full bg-[#252525] flex items-center justify-center text-xs font-bold text-[#818181]">
+                        {txQueue.length + 1}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${
+                      orderlyInitStatus === "success" ? "text-emerald-300"
+                      : orderlyInitStatus === "failed"  ? "text-red-300"
+                      : orderlyInitStatus === "loading" ? "text-white"
+                      : "text-[#818181]"
+                    }`}>Initialize Vault on Orderly</p>
+                    {orderlyInitStatus === "loading" && <p className="text-xs text-[#FB5F07] mt-0.5">Registering vault with Orderly API…</p>}
+                    {orderlyInitStatus === "success" && <p className="text-xs text-emerald-400 mt-0.5">Confirmed</p>}
+                    {orderlyInitStatus === "failed" && orderlyInitError && <p className="text-xs text-red-400 mt-0.5 break-all">{orderlyInitError}</p>}
+                  </div>
+                  {orderlyInitStatus === "failed" && (
+                    <button onClick={onRetryOrderly}
+                      className="btn-primary px-3 py-1.5 rounded-lg text-xs font-medium shrink-0">Retry</button>
+                  )}
+                  {!orderlyInitStatus && <span className="text-xs text-[#818181] shrink-0">Pending</span>}
+                </div>
+              )}
+            </div>
+
+            {(writeError || parseError) && (
+              <div className="p-4 rounded-lg bg-red-900/30 border border-red-700 text-red-300 text-sm space-y-2">
+                <p className="break-all">{writeError?.message?.slice(0, 300) ?? parseError}</p>
+                <button onClick={onResetError}
+                  className="text-[#FB5F07] hover:text-orange-300 underline text-xs">
+                  Retry transaction {deployingTxIdx + 1}
+                </button>
+              </div>
+            )}
+
+            <p className="text-center text-xs text-[#818181]">
+              {completedTxs.size} of {txQueue.length} transactions confirmed
+            </p>
+          </div>
+        ) : (
+          /* ── Success state ── */
+          <div className="p-8 flex flex-col items-center justify-center gap-5">
+            <div className="flex items-center justify-center h-16 w-16 rounded-full bg-green-900/40 border-2 border-green-500">
+              <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+
+            <h2 className="text-xl font-bold text-white">Vault Deployed</h2>
+            <p className="text-[#818181] text-sm font-mono break-all max-w-md text-center">{deployedVault}</p>
+
+            <div className="flex flex-wrap gap-2 justify-center">
+              {Array.from(selectedAssets).map((addr) => (
+                <span key={addr} className="inline-block rounded-full border border-emerald-500/40 bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-400">
+                  {assetLabel(addr)} whitelisted
+                </span>
+              ))}
+              <span className="inline-block rounded-full border border-[#FB5F07]/40 bg-[#FB5F07]/20 px-3 py-1 text-xs font-medium text-[#FB5F07]">
+                Modules configured
+              </span>
+              {isOrderlyPerps && (
+                <span className="inline-block rounded-full border border-blue-500/40 bg-blue-500/20 px-3 py-1 text-xs font-medium text-blue-400">
+                  Orderly initialized
+                </span>
+              )}
+            </div>
+
+            <div className="flex gap-4 pt-2">
+              <Link href={`/manage/${deployedVault}`} className="btn-primary px-6 py-2.5 rounded-lg font-medium text-center">Manage Vault</Link>
+              <Link href={`/vault/${deployedVault}`} className="btn-secondary px-6 py-2.5 rounded-lg font-medium text-center">View Vault</Link>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

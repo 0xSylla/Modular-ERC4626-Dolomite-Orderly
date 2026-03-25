@@ -47,12 +47,12 @@ contract E2EBeraIBGTTest is Script {
         address factoryAddr = vm.envAddress("FACTORY_ADDR");
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
 
         console.log("=== Phase 1: Create Vault (existing factory) ===");
         console.log("Deployer:", deployer);
         console.log("Factory:", factoryAddr);
-        console.log("DolomiteModule:", dolomiteModule);
+        console.log("DolomiteModule type hash set");
         console.log("Deployer USDC:", IERC20(USDC).balanceOf(deployer));
 
         vm.startBroadcast(pk);
@@ -135,8 +135,8 @@ contract E2EBeraIBGTTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 swapAmount   = IERC20(USDC).balanceOf(vaultAddr);
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(400_000));
@@ -194,8 +194,8 @@ contract E2EBeraIBGTTest is Script {
 
         DiracVaultFactory factory = DiracVaultFactory(factoryAddr);
         DiracVault vault = DiracVault(payable(vaultAddr));
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule   = factory.getModule(keccak256("swap.kodiak"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
 
         uint256 borrowAmount = vm.envOr("BORROW_AMOUNT", uint256(400_000));
         uint256 repayAmount  = vm.envOr("REPAY_AMOUNT",  borrowAmount);

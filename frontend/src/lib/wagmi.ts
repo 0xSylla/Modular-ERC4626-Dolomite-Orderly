@@ -20,7 +20,7 @@ export const berachain = defineChain({
 export { arbitrum };
 
 /** Default chain users are forced to on connect. */
-export const DEFAULT_CHAIN = berachain;
+export const DEFAULT_CHAIN = arbitrum;
 
 /** All chains the app supports. */
 export const SUPPORTED_CHAINS = [berachain, arbitrum] as const;

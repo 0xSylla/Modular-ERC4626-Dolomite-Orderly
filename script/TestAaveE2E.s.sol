@@ -128,7 +128,7 @@ contract TestAaveE2E is Script {
         bytes memory supplyData = abi.encodeCall(
             AaveModule.supplyCollateral, (WETH, wethAmount, 0)
         );
-        v.executeModule(AAVE_MODULE, supplyData);
+        v.executeModule(keccak256("lending.aave"), supplyData);
         console.log("[OK] Supplied WETH to Aave via vault");
 
         // Borrow ~0.5 USDC against it
@@ -136,7 +136,7 @@ contract TestAaveE2E is Script {
         bytes memory borrowData = abi.encodeCall(
             AaveModule.borrowAsset, (USDC, borrowAmt)
         );
-        v.executeModule(AAVE_MODULE, borrowData);
+        v.executeModule(keccak256("lending.aave"), borrowData);
         console.log("[OK] Borrowed USDC:", IERC20(USDC).balanceOf(vault));
 
         vm.stopBroadcast();
@@ -158,14 +158,14 @@ contract TestAaveE2E is Script {
         bytes memory repayData = abi.encodeCall(
             AaveModule.repayDebt, (USDC, type(uint256).max, 0, 0)
         );
-        v.executeModule(AAVE_MODULE, repayData);
+        v.executeModule(keccak256("lending.aave"), repayData);
         console.log("[OK] Repaid all USDC debt");
 
         // Withdraw all WETH from Aave
         bytes memory withdrawData = abi.encodeCall(
             AaveModule.withdrawCollateralAsset, (WETH, type(uint256).max)
         );
-        v.executeModule(AAVE_MODULE, withdrawData);
+        v.executeModule(keccak256("lending.aave"), withdrawData);
         uint256 wethInVault = IERC20(WETH).balanceOf(vault);
         console.log("[OK] Withdrew WETH from Aave:", wethInVault);
 

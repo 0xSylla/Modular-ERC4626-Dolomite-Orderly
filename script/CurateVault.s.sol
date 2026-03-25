@@ -38,9 +38,9 @@ contract CurateVault is Script {
         console.log("--- Step 3: Define Position ---");
 
         // Get module addresses from factory
-        address dolomiteModule = factory.getModule(keccak256("lending.dolomite"));
-        address kodiakModule = factory.getModule(keccak256("swap.kodiak"));
-        address orderlyModule = factory.getModule(keccak256("perps.orderly"));
+        bytes32 dolomiteModule = keccak256("lending.dolomite");
+        bytes32 kodiakModule = keccak256("swap.kodiak");
+        bytes32 orderlyModule = keccak256("perps.orderly");
 
         uint256 positionId = router.definePosition(
             vaultAddr,
