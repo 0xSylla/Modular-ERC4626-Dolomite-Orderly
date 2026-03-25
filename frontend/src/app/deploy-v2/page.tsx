@@ -129,6 +129,7 @@ export default function DeployV2Page() {
 
   // Deploy modal
   const [showDeployModal, setShowDeployModal] = useState(false);
+  const [showSubmitModal, setShowSubmitModal] = useState(false);
 
   // Which config section is expanded
   const [openSections, setOpenSections] = useState<Set<string>>(new Set(["assets", "lending", "perps", "risk"]));
@@ -432,9 +433,24 @@ export default function DeployV2Page() {
             })}
           </div>
 
-          <div className="p-6 rounded-xl border-2 border-dashed border-[#3C323A] bg-[#252525]/30 opacity-50">
-            <h3 className="text-lg font-semibold text-[#818181]">More strategies coming soon</h3>
-            <p className="text-sm text-[#818181]/60 mt-1">Yield farming, basis trading, and more.</p>
+          {/* Strategy Under Review cards */}
+          {[0, 1].map((i) => (
+            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]" style={{ background: "linear-gradient(135deg, #2d1a2e 0%, #3a1538 30%, #5a2a4a 60%, #7a3a5a 100%)" }}>
+              <div className="absolute inset-0 bg-black/70" />
+              <div className="relative p-5">
+                <h3 className="text-lg font-bold text-white">Strategy Under Review</h3>
+                <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by external strategists</p>
+                <p className="text-sm text-[#FB5F07]">Evaluated by Dirac quants</p>
+              </div>
+            </div>
+          ))}
+
+          {/* More strategies + Submit */}
+          <div className="pt-2">
+            <h3 className="text-lg font-bold text-white mb-3">More strategies coming</h3>
+            <button onClick={() => setShowSubmitModal(true)} className="btn-primary px-5 py-2.5 rounded-lg font-medium">
+              Submit a Strategy
+            </button>
           </div>
 
           <div className="flex justify-end pt-2">
@@ -1150,6 +1166,34 @@ function DeployModal({
           </div>
         )}
       </div>
+
+      {/* ========================== SUBMIT STRATEGY MODAL ================= */}
+      {showSubmitModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowSubmitModal(false)}>
+          <div className="rounded-xl border border-[#3C323A] bg-[#171717] p-6 max-w-md w-full mx-4 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-xl font-bold text-white">Submit a Strategy</h2>
+            <p className="text-sm text-[#818181]">
+              Submit your strategy via a ticket on Dirac Discord.
+            </p>
+            <div className="text-sm text-white space-y-1">
+              <p className="text-[#818181] mb-2">Include:</p>
+              <ul className="list-disc list-inside space-y-1 text-[#818181]">
+                <li>Description</li>
+                <li>Yield sources</li>
+                <li>Risks</li>
+                <li>Backtest</li>
+              </ul>
+            </div>
+            <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac team.</p>
+            <div className="flex justify-end gap-3 pt-2">
+              <button onClick={() => setShowSubmitModal(false)} className="btn-secondary px-4 py-2 rounded-lg text-sm">Close</button>
+              <a href="https://discord.gg/dirac" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
+                Go to Discord
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
