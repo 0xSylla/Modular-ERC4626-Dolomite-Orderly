@@ -398,7 +398,7 @@ export default function DeployV2Page() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Select Strategy</h1>
+        <h1 className="text-2xl font-bold text-white">Configure Vault</h1>
       </div>
 
       <ProgressBar currentStep={step} />
@@ -514,9 +514,9 @@ export default function DeployV2Page() {
             </div>
           </AccordionSection>
 
-          {/* --- Lending Module (pill buttons) --- */}
+          {/* --- Lending Protocol (pill buttons) --- */}
           <AccordionSection
-            title="Lending Module"
+            title="Lending Protocol"
             subtitle={moduleLabel(selectedLendingAddr)}
             isOpen={openSections.has("lending")}
             onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("lending") ? n.delete("lending") : n.add("lending"); return n; })}
@@ -540,9 +540,9 @@ export default function DeployV2Page() {
             </div>
           </AccordionSection>
 
-          {/* --- Perps Module (pill buttons) --- */}
+          {/* --- Perps Protocol (pill buttons) --- */}
           <AccordionSection
-            title="Perps Module"
+            title="Perps Protocol"
             subtitle={moduleLabel(selectedPerpsAddr)}
             isOpen={openSections.has("perps")}
             onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("perps") ? n.delete("perps") : n.add("perps"); return n; })}
@@ -589,10 +589,10 @@ export default function DeployV2Page() {
                   input[type=range]::-moz-range-track{height:8px;border-radius:4px;border:none;}
                   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);margin-top:-6px;}
                   input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);}
-                  .rb-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff0000,#ff4400,#ff8800,#ddaa00,#44cc44,#00aaff,#0066ff,#00cc88,#00ff66);}
-                  .rb-slider::-moz-range-track{background:linear-gradient(90deg,#ff0000,#ff4400,#ff8800,#ddaa00,#44cc44,#00aaff,#0066ff,#00cc88,#00ff66);}
-                  .fr-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#00ff66,#00cc88,#0066ff,#00aaff,#ddaa00,#ff8800,#ff4400,#ff0000);}
-                  .fr-slider::-moz-range-track{background:linear-gradient(90deg,#00ff66,#00cc88,#0066ff,#00aaff,#ddaa00,#ff8800,#ff4400,#ff0000);}
+                  .rb-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
+                  .rb-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
+                  .fr-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
+                  .fr-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
                 `}</style>
 
                 {/* Rebalancing threshold slider */}
@@ -815,8 +815,8 @@ export default function DeployV2Page() {
             <SummaryRow label="Fee Recipient" value={`${feeRecipient.slice(0, 6)}...${feeRecipient.slice(-4)}`} full />
             <SummaryRow label="Collateral Assets" value={Array.from(selectedAssets).map(assetLabel).join(", ")} full />
             <SummaryRow label="Swap Module"    value={moduleLabel(selectedSwapAddr)} />
-            <SummaryRow label="Lending Module" value={moduleLabel(selectedLendingAddr)} />
-            <SummaryRow label="Perps Module"   value={moduleLabel(selectedPerpsAddr)} />
+            <SummaryRow label="Lending Protocol" value={moduleLabel(selectedLendingAddr)} />
+            <SummaryRow label="Perps Protocol"   value={moduleLabel(selectedPerpsAddr)} />
             <SummaryRow label="Rebalancing Threshold" value={`${rebalanceThreshold}%`} />
             <SummaryRow label="Execution Mode" value={execMode.toUpperCase()} />
           </div>
