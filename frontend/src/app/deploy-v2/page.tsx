@@ -422,13 +422,6 @@ export default function DeployV2Page() {
                     <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-white">{t.name}</h3>
                       <p className="text-sm text-[#818181] leading-relaxed whitespace-pre-line">{t.description}</p>
-                      <div className="flex gap-2 pt-1">
-                        {t.tags.map((tag) => (
-                          <span key={tag} className="inline-block rounded-full bg-[#252525] border border-[#3C323A] px-2.5 py-0.5 text-xs font-medium text-[#818181]">
-                            {tag}
-                          </span>
-                        ))}
-                      </div>
                     </div>
                     <div className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07]" : "border-[#3C323A]"}`}>
                       {isSelected && <div className="h-2.5 w-2.5 rounded-full bg-[#FB5F07]" />}
