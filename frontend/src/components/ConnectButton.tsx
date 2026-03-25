@@ -93,9 +93,6 @@ export default function ConnectButton() {
                 >
                   <span className={`w-2 h-2 rounded-full ${s?.dot ?? "bg-gray-500"}`} />
                   {c.name}
-                  {!live && (
-                    <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[#3C323A] text-[#818181]">Soon</span>
-                  )}
                   {active && live && (
                     <svg className="ml-auto w-3.5 h-3.5" style={{ color: "#FB5F07" }} fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414L8.414 15l-4.121-4.121a1 1 0 011.414-1.414L8.414 12.172l7.879-7.879a1 1 0 011.414 0z" clipRule="evenodd" />

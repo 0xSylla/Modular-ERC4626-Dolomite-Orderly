@@ -55,19 +55,19 @@ export { mainnet, arbitrum, avalanche, base, bsc, optimism, polygon, zksync };
 /** Default chain users are forced to on connect. */
 export const DEFAULT_CHAIN = arbitrum;
 
-/** All chains the app supports (browsable in dropdown). */
+/** All chains the app supports (browsable in dropdown) — alphabetical. */
 export const SUPPORTED_CHAINS = [
   arbitrum,
-  berachain,
-  mainnet,
   avalanche,
   base,
+  berachain,
   bsc,
+  mainnet,
+  monad,
   optimism,
+  plasma,
   polygon,
   zksync,
-  plasma,
-  monad,
 ] as const;
 
 /** Chains with deployed contracts (wallet can connect). */

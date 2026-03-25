@@ -43,9 +43,9 @@ interface TemplateInfo {
 const TEMPLATES: TemplateInfo[] = [
   {
     id: "delta-neutral-v1",
-    name: "Delta Neutral v1",
+    name: "Delta Neutral",
     description:
-      "Market-neutral strategy that combines collateral lending on Dolomite with short perpetual positions on Orderly to capture yield while hedging price exposure. Ideal for stablecoin depositors seeking yield on volatile assets like iBGT.",
+      "Deposit USDC → delta-neutral exposure → capture yield\n\nCuration: Rebalancing · Execution · Funding regime\nYield sources: Staking · Lending · Funding",
     tags: ["Lending", "Perps Hedging", "Yield"],
   },
 ];
@@ -397,8 +397,7 @@ export default function DeployV2Page() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-white">Deploy a New Vault</h1>
-        <p className="text-[#818181] mt-1">Streamlined deployment — configure everything in one step.</p>
+        <h1 className="text-2xl font-bold text-white">Select a Strategy to Deploy</h1>
       </div>
 
       <ProgressBar currentStep={step} />
@@ -406,10 +405,7 @@ export default function DeployV2Page() {
       {/* ========================== STEP 1: STRATEGY ======================== */}
       {step === "strategy" && (
         <div className="space-y-5">
-          <h2 className="text-lg font-semibold text-white">Select a Strategy Template</h2>
-          <p className="text-sm text-[#818181]">
-            Choose a vault strategy. Each template defines the modules and execution logic.
-          </p>
+          <div />
 
           <div className="grid grid-cols-1 gap-4">
             {TEMPLATES.map((t) => {
@@ -425,7 +421,7 @@ export default function DeployV2Page() {
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
                       <h3 className="text-lg font-semibold text-white">{t.name}</h3>
-                      <p className="text-sm text-[#818181] leading-relaxed">{t.description}</p>
+                      <p className="text-sm text-[#818181] leading-relaxed whitespace-pre-line">{t.description}</p>
                       <div className="flex gap-2 pt-1">
                         {t.tags.map((tag) => (
                           <span key={tag} className="inline-block rounded-full bg-[#252525] border border-[#3C323A] px-2.5 py-0.5 text-xs font-medium text-[#818181]">
