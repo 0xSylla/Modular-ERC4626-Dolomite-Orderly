@@ -13,9 +13,9 @@ import { parseUnits, keccak256, encodePacked, toBytes } from "viem";
 import { useAddresses, factoryAbi, vaultAbi, curatorRouterAbi } from "@/lib/contracts";
 import { useBrowsingChain } from "@/lib/ChainContext";
 import { initializeVault } from "@/lib/api";
-import dynamic from "next/dynamic";
+import nextDynamic from "next/dynamic";
 
-const BacktestEquityChart = dynamic(() => import("@/components/BacktestEquityChart"), { ssr: false });
+const BacktestEquityChart = nextDynamic(() => import("@/components/BacktestEquityChart"), { ssr: false });
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -339,7 +339,6 @@ export default function DeployV2Page() {
         return;
       }
     }
-    setShowDeployModal(true);
     setDeployingTxIdx(0);
     setCompletedTxs(new Set());
     setDeployedVault(null);
@@ -579,6 +578,18 @@ export default function DeployV2Page() {
               isValid={isRiskValid}
             >
               <div className="space-y-4">
+                <style>{`
+                  input[type=range]{-webkit-appearance:none;width:100%;height:8px;border-radius:4px;outline:none;background:transparent;}
+                  input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;}
+                  input[type=range]::-moz-range-track{height:8px;border-radius:4px;border:none;}
+                  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);margin-top:-6px;}
+                  input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);}
+                  .rb-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff0000,#ff4400,#ff8800,#ddaa00,#44cc44,#00aaff,#0066ff,#00cc88,#00ff66);}
+                  .rb-slider::-moz-range-track{background:linear-gradient(90deg,#ff0000,#ff4400,#ff8800,#ddaa00,#44cc44,#00aaff,#0066ff,#00cc88,#00ff66);}
+                  .fr-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#00ff66,#00cc88,#0066ff,#00aaff,#ddaa00,#ff8800,#ff4400,#ff0000);}
+                  .fr-slider::-moz-range-track{background:linear-gradient(90deg,#00ff66,#00cc88,#0066ff,#00aaff,#ddaa00,#ff8800,#ff4400,#ff0000);}
+                `}</style>
+
                 {/* Rebalancing threshold slider */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -593,19 +604,52 @@ export default function DeployV2Page() {
                     max={45}
                     value={rebalanceThreshold}
                     onChange={(e) => setRebalanceThreshold(Number(e.target.value))}
-                    className="w-full accent-orange-500"
+                    className="rb-slider"
                   />
                   <div className="flex justify-between text-[10px] text-[#818181] mt-1 px-0.5">
                     <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>45%</span>
                   </div>
                 </div>
 
+                {/* Funding regime filter — below rebalancing slider */}
+                <div className="rounded-lg border border-[#3C323A] bg-[#252525] p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-[#818181] uppercase tracking-wider">Funding Filter</span>
+                      <button
+                        onClick={() => setFundingFilterOn(!fundingFilterOn)}
+                        className={`relative w-9 h-5 rounded-full transition-all ${
+                          fundingFilterOn ? "bg-amber-500" : "bg-[#3C323A]"
+                        }`}
+                      >
+                        <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
+                          fundingFilterOn ? "left-[18px]" : "left-0.5"
+                        }`} />
+                      </button>
+                    </div>
+                    {fundingFilterOn && (
+                      <span className="text-sm text-amber-400 font-mono font-bold">
+                        {Math.round((fundingSlider / 100) * (-0.00033445) * 100000) / 10} bps
+                      </span>
+                    )}
+                  </div>
+                  {fundingFilterOn && (
+                    <input
+                      type="range"
+                      min={0}
+                      max={100}
+                      value={fundingSlider}
+                      onChange={(e) => setFundingSlider(Number(e.target.value))}
+                      className="fr-slider"
+                    />
+                  )}
+                </div>
+
                 {/* Backtest chart + stats */}
                 <BacktestEquityChart threshold={rebalanceThreshold} execMode={execMode} fundingFilterOn={fundingFilterOn} fundingSlider={fundingSlider} />
 
-                {/* Toggles row below chart */}
+                {/* CEX / DEX toggle below chart */}
                 <div className="flex items-center gap-4 flex-wrap">
-                  {/* CEX / DEX toggle */}
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-[#818181] uppercase tracking-wider">Execution</span>
                     <div className="flex rounded-lg border border-[#3C323A] overflow-hidden">
@@ -626,36 +670,6 @@ export default function DeployV2Page() {
                         }`}
                       >CEX</button>
                     </div>
-                  </div>
-
-                  {/* Funding regime filter */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] text-[#818181] uppercase tracking-wider">Funding Filter</span>
-                    <button
-                      onClick={() => setFundingFilterOn(!fundingFilterOn)}
-                      className={`relative w-9 h-5 rounded-full transition-all ${
-                        fundingFilterOn ? "bg-amber-500" : "bg-[#3C323A]"
-                      }`}
-                    >
-                      <div className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition-all ${
-                        fundingFilterOn ? "left-[18px]" : "left-0.5"
-                      }`} />
-                    </button>
-                    {fundingFilterOn && (
-                      <div className="flex items-center gap-1.5">
-                        <input
-                          type="range"
-                          min={0}
-                          max={100}
-                          value={fundingSlider}
-                          onChange={(e) => setFundingSlider(Number(e.target.value))}
-                          className="w-24 accent-amber-500"
-                        />
-                        <span className="text-[10px] text-amber-400 font-mono font-medium min-w-[40px]">
-                          {Math.round((fundingSlider / 100) * (-0.00033445) * 100000) / 10} bps
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
 
@@ -758,7 +772,7 @@ export default function DeployV2Page() {
                   max={45}
                   value={rebalanceThreshold}
                   onChange={(e) => setRebalanceThreshold(Number(e.target.value))}
-                  className="w-full accent-orange-500"
+                  className="rb-slider"
                 />
                 <div className="flex justify-between text-[10px] text-[#818181] mt-1">
                   <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>45%</span>
@@ -816,36 +830,18 @@ export default function DeployV2Page() {
         </div>
       )}
 
-      {/* ========================== DEPLOY MODAL ============================ */}
-      {showDeployModal && <DeployModal
-        txQueue={txQueue}
-        deployingTxIdx={deployingTxIdx}
-        completedTxs={completedTxs}
-        isSigning={isSigning}
-        isConfirming={isConfirming}
-        writeError={writeError}
-        parseError={parseError}
-        deployedVault={deployedVault}
-        isOrderlyPerps={isOrderlyPerps}
-        orderlyInitStatus={orderlyInitStatus}
-        orderlyInitError={orderlyInitError}
-        selectedAssets={selectedAssets}
-        assetLabel={assetLabel}
-        chainId={chainId}
-        onRetryTx={(idx) => startTx(idx, deployedVault)}
-        onResetError={() => { resetWrite(); setParseError(null); }}
-        onRetryOrderly={() => {
-          if (!deployedVault) return;
-          setOrderlyInitStatus("loading");
-          setOrderlyInitError(null);
-          initializeVault(chainId, deployedVault, 2)
-            .then(() => { setOrderlyInitStatus("success"); })
-            .catch((err: Error) => {
-              setOrderlyInitError(err?.message ?? "Orderly initialization failed");
-              setOrderlyInitStatus("failed");
-            });
-        }}
-      />}
+      {/* ========================== INLINE DEPLOY STATUS ===================== */}
+      {(isSigning || isConfirming || deployedVault) && (
+        <div className="mt-4 rounded-lg border border-[#3C323A] bg-[#252525] p-4 space-y-2">
+          {isSigning && <p className="text-sm text-amber-300">Waiting for wallet signature...</p>}
+          {isConfirming && <p className="text-sm text-blue-300">Confirming on-chain...</p>}
+          {writeError && <p className="text-sm text-red-400">{(writeError as Error).message}</p>}
+          {parseError && <p className="text-sm text-red-400">{parseError}</p>}
+          {deployedVault && (
+            <p className="text-sm text-emerald-400">Vault deployed: <span className="font-mono">{deployedVault}</span></p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
