@@ -24,8 +24,8 @@ const BacktestEquityChart = nextDynamic(() => import("@/components/BacktestEquit
 type Step = "strategy" | "configure" | "review";
 
 const STEPS: { key: Step; label: string }[] = [
-  { key: "strategy",  label: "Strategy" },
-  { key: "configure", label: "Configure" },
+  { key: "strategy",  label: "Select Strategy" },
+  { key: "configure", label: "Configure Vault" },
   { key: "review",    label: "Review & Deploy" },
 ];
 
