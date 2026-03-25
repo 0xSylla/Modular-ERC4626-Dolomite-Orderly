@@ -868,7 +868,7 @@ export default function DeployV2Page() {
             <p className="text-sm text-[#FB5F07] font-medium">Reviewed by Dirac team.</p>
             <div className="flex justify-end gap-3 pt-2">
               <button onClick={() => setShowSubmitModal(false)} className="btn-secondary px-4 py-2 rounded-lg text-sm">Close</button>
-              <a href="https://discord.gg/dirac" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
+              <a href="https://discord.com/invite/xQVwD9Xad9" target="_blank" rel="noopener noreferrer" className="btn-primary px-4 py-2 rounded-lg text-sm font-medium inline-block text-center">
                 Go to Discord
               </a>
             </div>
