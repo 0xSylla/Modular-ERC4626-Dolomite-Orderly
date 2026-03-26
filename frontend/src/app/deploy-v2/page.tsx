@@ -119,7 +119,7 @@ export default function DeployV2Page() {
   const [selectedSwapAddr,    setSelectedSwapAddr]    = useState("");
   const [selectedLendingAddr, setSelectedLendingAddr] = useState("");
   const [selectedPerpsAddr,   setSelectedPerpsAddr]   = useState("");
-  const [selectedPerpsKey,    setSelectedPerpsKey]    = useState("");
+  const [selectedPerpsKey,    setSelectedPerpsKey]    = useState("perps.orderly");
   const [rebalanceThreshold, setRebalanceThreshold]   = useState(25);
   const [execMode, setExecMode]                       = useState<"cex" | "dex">("dex");
   const [fundingFilterOn, setFundingFilterOn]           = useState(false);
