@@ -10,7 +10,7 @@ const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
 
 export const metadata: Metadata = {
   title: "Dirac Finance",
-  description: "Delta-neutral vault protocol on Berachain",
+  description: "Curated Delta-Neutral Vaults",
   icons: { icon: "/favicon.svg" },
 };
 

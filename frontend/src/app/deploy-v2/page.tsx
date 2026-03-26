@@ -101,7 +101,7 @@ export default function DeployV2Page() {
   const [step, setStep] = useState<Step>("strategy");
 
   // Step 1: Strategy
-  const [template, setTemplate] = useState("delta-neutral-v1");
+  const [template, setTemplate] = useState("");
 
   // Step 2: All config combined
   const [vaultName, setVaultName]     = useState("");
