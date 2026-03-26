@@ -118,8 +118,8 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
               </linearGradient>
             </defs>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.025)" />
-            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "#555" }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
-            <YAxis tick={{ fontSize: 8, fill: "#555" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1e6).toFixed(2)}M`} domain={["auto", "auto"]} width={50} />
+            <XAxis dataKey="date" tick={{ fontSize: 8, fill: "#7a7a88" }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
+            <YAxis tick={{ fontSize: 8, fill: "#7a7a88" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1e6).toFixed(2)}M`} domain={["auto", "auto"]} width={50} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={1000000} stroke="rgba(255,255,255,0.06)" strokeDasharray="6 4" />
             <Area type="monotone" dataKey="equity" name="Equity" stroke={curveColor} strokeWidth={2} fill="url(#btGrad)" dot={false} isAnimationActive={false} />
@@ -135,8 +135,8 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
         <ResponsiveContainer width="100%" height="85%">
           <BarChart data={curve}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-            <XAxis dataKey="date" tick={{ fill: "#383844", fontSize: 7 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
-            <YAxis tick={{ fill: "#383844", fontSize: 7 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={36} />
+            <XAxis dataKey="date" tick={{ fill: "#6a6a78", fontSize: 7 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
+            <YAxis tick={{ fill: "#6a6a78", fontSize: 7 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={36} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.06)" />
             <Bar dataKey="pnl" name="Daily P&L" radius={[2, 2, 0, 0]}>
@@ -155,8 +155,8 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
         <ResponsiveContainer width="100%" height="85%">
           <BarChart data={curve}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-            <XAxis dataKey="date" tick={{ fill: "#383844", fontSize: 7 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
-            <YAxis tick={{ fill: "#383844", fontSize: 7 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={36} />
+            <XAxis dataKey="date" tick={{ fill: "#6a6a78", fontSize: 7 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 6)} />
+            <YAxis tick={{ fill: "#6a6a78", fontSize: 7 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={36} />
             <Tooltip content={<ChartTooltip />} />
             <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
             <Bar dataKey="fr" name="Funding" radius={[2, 2, 0, 0]}>
@@ -179,8 +179,8 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
           <ResponsiveContainer width="100%" height="85%">
             <LineChart data={curve}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-              <XAxis dataKey="date" tick={{ fill: "#383844", fontSize: 6 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 4)} />
-              <YAxis tick={{ fill: "#383844", fontSize: 6 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={32} />
+              <XAxis dataKey="date" tick={{ fill: "#6a6a78", fontSize: 6 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 4)} />
+              <YAxis tick={{ fill: "#6a6a78", fontSize: 6 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={32} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
               <Line type="monotone" dataKey="cNet" name="Net" stroke="#ffffff" strokeWidth={2} dot={false} />
@@ -200,8 +200,8 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
           <ResponsiveContainer width="100%" height="85%">
             <LineChart data={curve}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" />
-              <XAxis dataKey="date" tick={{ fill: "#383844", fontSize: 6 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 4)} />
-              <YAxis tick={{ fill: "#383844", fontSize: 6 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={32} />
+              <XAxis dataKey="date" tick={{ fill: "#6a6a78", fontSize: 6 }} tickLine={false} axisLine={false} interval={Math.floor(curve.length / 4)} />
+              <YAxis tick={{ fill: "#6a6a78", fontSize: 6 }} tickLine={false} axisLine={false} tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} width={32} />
               <Tooltip content={<ChartTooltip />} />
               <ReferenceLine y={0} stroke="rgba(255,255,255,0.08)" />
               <Line type="monotone" dataKey="cBc" name="Borrow" stroke="#ff4d4d" strokeWidth={1.5} dot={false} />

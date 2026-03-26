@@ -140,7 +140,7 @@ export default function DeployV2Page() {
   const [selectedSwapAddr,    setSelectedSwapAddr]    = useState("");
   const [selectedLendingAddr, setSelectedLendingAddr] = useState("");
   const [selectedPerpsAddr,   setSelectedPerpsAddr]   = useState("");
-  const [selectedPerpsKey,    setSelectedPerpsKey]    = useState("perps.orderly");
+  const [selectedPerpsKey,    setSelectedPerpsKey]    = useState("perps.gmx");
   const [rebalanceThreshold, setRebalanceThreshold]   = useState(25);
   const [execMode, setExecMode]                       = useState<"cex" | "dex">("dex");
   const [fundingFilterOn, setFundingFilterOn]           = useState(false);
@@ -503,13 +503,6 @@ export default function DeployV2Page() {
       {/* ========================== STEP 2: CONFIGURE (ALL IN ONE) ========= */}
       {step === "configure" && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-white">Configure Your Vault</h2>
-              <p className="text-xs text-[#818181] mt-1">Strategy: {selectedTemplate?.name}</p>
-            </div>
-          </div>
-
           {/* --- Underlying Asset (first position) --- */}
           <AccordionSection
             title="Underlying Asset"
