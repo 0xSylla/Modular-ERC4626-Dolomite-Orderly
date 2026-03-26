@@ -119,6 +119,7 @@ export default function DeployV2Page() {
   const [selectedSwapAddr,    setSelectedSwapAddr]    = useState("");
   const [selectedLendingAddr, setSelectedLendingAddr] = useState("");
   const [selectedPerpsAddr,   setSelectedPerpsAddr]   = useState("");
+  const [selectedPerpsKey,    setSelectedPerpsKey]    = useState("");
   const [rebalanceThreshold, setRebalanceThreshold]   = useState(25);
   const [execMode, setExecMode]                       = useState<"cex" | "dex">("dex");
   const [fundingFilterOn, setFundingFilterOn]           = useState(false);
@@ -191,11 +192,14 @@ export default function DeployV2Page() {
     address: (moduleData?.[moduleResultIdx++]?.result as string | undefined) ?? "",
   })).filter((m) => m.address && m.address !== ZERO_ADDR);
 
+  // All perps modules map to Orderly's on-chain address
+  const orderlyAddr = (moduleData?.[moduleResultIdx]?.result as string | undefined) ?? "";
+  // Skip all perps module result slots
+  moduleResultIdx += KNOWN_MODULES_PERPS.length;
   const availablePerpsModules = KNOWN_MODULES_PERPS.map((m) => ({
     ...m,
-    address: (moduleData?.[moduleResultIdx++]?.result as string | undefined) ?? "",
-    registered: false as boolean,
-  })).map((m) => ({ ...m, registered: !!(m.address && m.address !== ZERO_ADDR) }));
+    address: orderlyAddr, // all route to Orderly under the hood
+  }));
 
   useEffect(() => {
     if (!selectedSwapAddr    && availableSwapModules[0])    setSelectedSwapAddr(availableSwapModules[0].address);
@@ -203,7 +207,7 @@ export default function DeployV2Page() {
       const morpho = availableLendingModules.find((m) => m.key === "lending.morpho");
       setSelectedLendingAddr(morpho ? morpho.address : availableLendingModules[0].address);
     }
-    if (!selectedPerpsAddr) { const first = availablePerpsModules.find((m) => m.registered); if (first) setSelectedPerpsAddr(first.address); }
+    if (!selectedPerpsKey && availablePerpsModules[0]) { setSelectedPerpsKey(availablePerpsModules[0].key); setSelectedPerpsAddr(availablePerpsModules[0].address); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleData]);
 
@@ -557,25 +561,23 @@ export default function DeployV2Page() {
           {/* --- Perps Protocol (pill buttons) --- */}
           <AccordionSection
             title="Perps Protocol"
-            subtitle={moduleLabel(selectedPerpsAddr)}
+            subtitle={availablePerpsModules.find((m) => m.key === selectedPerpsKey)?.label ?? ""}
             isOpen={openSections.has("perps")}
             onToggle={() => setOpenSections(s => { const n = new Set(s); n.has("perps") ? n.delete("perps") : n.add("perps"); return n; })}
             isValid={selectedPerpsAddr.length > 0}
           >
             <div className="flex flex-wrap gap-2">
               {availablePerpsModules.map((m) => {
-                const isSelected = selectedPerpsAddr === m.address && m.registered;
+                const isSelected = selectedPerpsKey === m.key;
                 return (
-                  <button key={m.key} onClick={() => m.registered && setSelectedPerpsAddr(m.address)}
-                    disabled={!m.registered}
+                  <button key={m.key} onClick={() => { setSelectedPerpsKey(m.key); setSelectedPerpsAddr(m.address); }}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      !m.registered ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default"
-                      : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
                     }`}>
                     <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
                       {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                     </div>
-                    <span className={`text-sm font-medium ${m.registered ? "text-white" : "text-[#818181]"}`}>{m.label}</span>
+                    <span className="text-sm font-medium text-white">{m.label}</span>
                   </button>
                 );
               })}
@@ -823,7 +825,7 @@ export default function DeployV2Page() {
             <div className="rounded-xl border border-[#FB5F07]/40 bg-[#252525]/60 p-4 space-y-1">
               <p className="text-xs text-[#818181] uppercase tracking-wider mb-2">Execution</p>
               <p className="text-xs text-[#818181]">Lending: <span className="text-white">{moduleLabel(selectedLendingAddr)}</span></p>
-              <p className="text-xs text-[#818181]">Perps: <span className="text-white">{moduleLabel(selectedPerpsAddr)}</span></p>
+              <p className="text-xs text-[#818181]">Perps: <span className="text-white">{availablePerpsModules.find((m) => m.key === selectedPerpsKey)?.label ?? "—"}</span></p>
               <p className="text-xs text-[#818181]">Mode: <span className="text-white">{execMode.toUpperCase()}</span></p>
             </div>
 
