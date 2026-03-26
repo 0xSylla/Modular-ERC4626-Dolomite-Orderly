@@ -67,15 +67,21 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
   const netYield = stats.pnl ?? 0;
   const curveColor = stats.apy >= 0 ? "#2ecc71" : "#ff4d4d";
 
-  // Sharpe Ratio: annualized mean daily return / std daily return
+  // Sharpe Ratio from equity curve: returns_t = (equity_t / equity_{t-1}) - 1
   const sharpe = useMemo(() => {
     if (!curve || curve.length < 2) return 0;
-    const returns = curve.map((d: any) => (d.pnl ?? 0) / 1000000); // daily return as fraction of $1M
-    const mean = returns.reduce((a: number, b: number) => a + b, 0) / returns.length;
-    const variance = returns.reduce((a: number, b: number) => a + (b - mean) ** 2, 0) / returns.length;
-    const std = Math.sqrt(variance);
-    if (std === 0) return 0;
-    return Math.round((mean / std) * Math.sqrt(365) * 10) / 10;
+    const returns: number[] = [];
+    for (let i = 1; i < curve.length; i++) {
+      const prev = (curve[i - 1] as any).equity;
+      const curr = (curve[i] as any).equity;
+      if (prev > 0) returns.push(curr / prev - 1);
+    }
+    if (returns.length === 0) return 0;
+    const mean = returns.reduce((a, b) => a + b, 0) / returns.length;
+    const variance = returns.reduce((a, b) => a + (b - mean) ** 2, 0) / returns.length;
+    const vol = Math.sqrt(variance);
+    if (vol === 0) return 0;
+    return Math.round((mean / vol) * Math.sqrt(365) * 100) / 100;
   }, [curve]);
 
   return (
