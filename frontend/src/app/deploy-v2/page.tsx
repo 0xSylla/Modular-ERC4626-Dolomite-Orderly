@@ -88,6 +88,27 @@ const selectClass =
 /*                                  Component                                 */
 /* -------------------------------------------------------------------------- */
 
+// Interpolate color along the slider track gradient: #ff8800 → #ffaa33 → #ffcc66 → #ffe0a0 → #fff5e0
+function lerpTrackColor(t: number): string {
+  const stops = [
+    [0, 0xff, 0x88, 0x00],
+    [0.25, 0xff, 0xaa, 0x33],
+    [0.5, 0xff, 0xcc, 0x66],
+    [0.75, 0xff, 0xe0, 0xa0],
+    [1, 0xff, 0xf5, 0xe0],
+  ];
+  const clamped = Math.max(0, Math.min(1, t));
+  let i = 0;
+  while (i < stops.length - 2 && clamped > stops[i + 1][0]) i++;
+  const [t0, r0, g0, b0] = stops[i];
+  const [t1, r1, g1, b1] = stops[i + 1];
+  const f = (clamped - t0) / (t1 - t0);
+  const r = Math.round(r0 + (r1 - r0) * f);
+  const g = Math.round(g0 + (g1 - g0) * f);
+  const b = Math.round(b0 + (b1 - b0) * f);
+  return `rgb(${r},${g},${b})`;
+}
+
 export default function DeployV2Page() {
   const { address: connectedAddress, isConnected, chain: walletChain } = useAccount();
   const { browsingChainId: chainId } = useBrowsingChain();
@@ -611,9 +632,7 @@ export default function DeployV2Page() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-[#818181] uppercase tracking-wider">Rebalancing Threshold</label>
-                    <span className={`text-2xl font-bold font-mono ${
-                      rebalanceThreshold <= 10 ? "text-red-400" : rebalanceThreshold <= 20 ? "text-amber-400" : rebalanceThreshold <= 30 ? "text-blue-400" : "text-emerald-400"
-                    }`}>{rebalanceThreshold}%</span>
+                    <span className="text-2xl font-bold font-mono" style={{ color: lerpTrackColor((rebalanceThreshold - 1) / 44) }}>{rebalanceThreshold}%</span>
                   </div>
                   <input
                     type="range"
@@ -645,7 +664,7 @@ export default function DeployV2Page() {
                       </button>
                     </div>
                     {fundingFilterOn && (
-                      <span className="text-sm text-amber-400 font-mono font-bold">
+                      <span className="text-sm font-mono font-bold" style={{ color: lerpTrackColor(fundingSlider / 100) }}>
                         {Math.round((fundingSlider / 100) * (-0.00033445) * 100000) / 10} bps
                       </span>
                     )}
