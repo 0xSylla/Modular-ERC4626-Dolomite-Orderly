@@ -68,10 +68,10 @@ const KNOWN_MODULES_LENDING = [
 ] as const;
 
 const KNOWN_MODULES_PERPS = [
-  { key: "perps.gmx",     label: "GMX",         hash: keccak256(encodePacked(["string"], ["perps.gmx"])) },
-  { key: "perps.hyperliquid", label: "HyperLiquid", hash: keccak256(encodePacked(["string"], ["perps.hyperliquid"])) },
-  { key: "perps.d8x",     label: "D8X",         hash: keccak256(encodePacked(["string"], ["perps.d8x"])) },
-  { key: "perps.orderly",  label: "Orderly",     hash: keccak256(encodePacked(["string"], ["perps.orderly"])) },
+  { key: "perps.gmx",         label: "GMX",         hash: keccak256(encodePacked(["string"], ["perps.gmx"])) },
+  { key: "perps.hyperliquid", label: "Hyperliquid", hash: keccak256(encodePacked(["string"], ["perps.hyperliquid"])) },
+  { key: "perps.d8x",         label: "D8X",         hash: keccak256(encodePacked(["string"], ["perps.d8x"])) },
+  { key: "perps.orderly",     label: "Orderly",     hash: keccak256(encodePacked(["string"], ["perps.orderly"])) },
 ] as const;
 
 /* -------------------------------------------------------------------------- */
@@ -419,7 +419,7 @@ export default function DeployV2Page() {
               return (
                 <button
                   key={t.id}
-                  onClick={() => setTemplate(t.id)}
+                  onClick={() => setTemplate(template === t.id ? "" : t.id)}
                   className={`text-left p-6 rounded-xl border-2 transition-all ${
                     isSelected ? "border-[#FB5F07]" : "border-[#3C323A] hover:border-[#818181]"
                   }`}
