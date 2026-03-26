@@ -576,12 +576,6 @@ export default function DeployV2Page() {
                   </button>
                 );
               })}
-              {["SNX", "GNS"].map((label) => (
-                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default">
-                  <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-[#3C323A]" />
-                  <span className="text-sm font-medium text-[#818181]">{label}</span>
-                </button>
-              ))}
             </div>
           </AccordionSection>
 
