@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Providers from "@/components/Providers";
 import ConnectButton from "@/components/ConnectButton";
+import AccessGate from "@/components/AccessGate";
 import "./globals.css";
 
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
@@ -26,6 +27,7 @@ export default function RootLayout({
         style={{ fontFamily: "var(--font-nunito), system-ui, sans-serif" }}
       >
         <Providers>
+          <AccessGate>
           <nav className="border-b sticky top-0 z-50 backdrop-blur-md" style={{ borderColor: "#3C323A", background: "rgba(0,0,0,0.4)" }}>
             <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
               <div className="flex items-center gap-8">
@@ -46,22 +48,10 @@ export default function RootLayout({
                     Vaults Registry
                   </Link>
                   <Link
-                    href="/deploy"
-                    className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                  >
-                    Deploy
-                  </Link>
-                  <Link
                     href="/deploy-v2"
                     className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                   >
-                    Deploy v2
-                  </Link>
-                  <Link
-                    href="/admin"
-                    className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
-                  >
-                    Admin
+                    Deploy
                   </Link>
                 </div>
               </div>
@@ -69,6 +59,7 @@ export default function RootLayout({
             </div>
           </nav>
           <main className="max-w-5xl mx-auto px-6 py-10">{children}</main>
+          </AccessGate>
         </Providers>
       </body>
     </html>
