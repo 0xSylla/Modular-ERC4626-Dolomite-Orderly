@@ -68,7 +68,10 @@ const KNOWN_MODULES_LENDING = [
 ] as const;
 
 const KNOWN_MODULES_PERPS = [
-  { key: "perps.orderly", label: "Orderly", hash: keccak256(encodePacked(["string"], ["perps.orderly"])) },
+  { key: "perps.gmx",     label: "GMX",         hash: keccak256(encodePacked(["string"], ["perps.gmx"])) },
+  { key: "perps.hyperliquid", label: "HyperLiquid", hash: keccak256(encodePacked(["string"], ["perps.hyperliquid"])) },
+  { key: "perps.d8x",     label: "D8X",         hash: keccak256(encodePacked(["string"], ["perps.d8x"])) },
+  { key: "perps.orderly",  label: "Orderly",     hash: keccak256(encodePacked(["string"], ["perps.orderly"])) },
 ] as const;
 
 /* -------------------------------------------------------------------------- */
@@ -422,12 +425,12 @@ export default function DeployV2Page() {
                   }`}
                   style={{ background: isSelected
                     ? "linear-gradient(135deg, #2d1a0e 0%, #3a1f10 30%, #4a2510 60%, #5a2a12 100%)"
-                    : "#111111"
+                    : "rgba(30, 20, 30, 0.7)"
                   }}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
-                      <h3 className="inline-block text-sm font-bold text-white bg-black/80 px-3 py-1 rounded-md">{t.name}</h3>
+                      <h3 className="text-lg font-semibold text-white">{t.name}</h3>
                       <p className="text-sm text-[#818181] leading-relaxed whitespace-pre-line">{t.description}</p>
                     </div>
                     <div className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07]" : "border-[#3C323A]"}`}>
@@ -444,11 +447,11 @@ export default function DeployV2Page() {
             { name: "RWA Strategy" },
             { name: "Options Strategy" },
           ].map((s) => (
-            <div key={s.name} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "#2a2a2a" }}>
+            <div key={s.name} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "linear-gradient(135deg, #2a1530 0%, #3a1a3a 30%, #5a2555 60%, #7a3570 100%)" }}>
               <div className="absolute inset-0" />
               <div className="relative p-5">
-                <h3 className="inline-block text-sm font-bold text-white bg-black/80 px-3 py-1 rounded-md">{s.name}</h3>
-                <p className="text-xs font-semibold text-white mt-2 bg-black/60 inline-block px-2 py-0.5 rounded">Under Review</p>
+                <h3 className="text-lg font-bold text-white">{s.name}</h3>
+                <p className="text-xs font-semibold text-[#818181] mt-1">Under Review</p>
                 <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by strategists</p>
                 <p className="text-sm text-[#FB5F07]">Evaluated by Dirac quants</p>
               </div>
@@ -499,7 +502,7 @@ export default function DeployV2Page() {
                     onClick={() => enabled && toggleAsset(asset.address)}
                     disabled={!enabled}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      !enabled ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed"
+                      !enabled ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default"
                       : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
                     }`}
                   >
@@ -516,7 +519,7 @@ export default function DeployV2Page() {
               })}
               {/* Extra greyed-out tokens */}
               {["XRP", "HYPE"].map((label) => (
-                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed">
+                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default">
                   <div className="h-3.5 w-3.5 shrink-0 rounded border-2 border-[#3C323A]" />
                   <span className="text-sm font-medium text-[#818181]">{label}</span>
                 </button>
@@ -573,8 +576,8 @@ export default function DeployV2Page() {
                   </button>
                 );
               })}
-              {["Hyperliquid", "GMX"].map((label) => (
-                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-not-allowed">
+              {["SNX", "GNS"].map((label) => (
+                <button key={label} disabled className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default">
                   <div className="h-3.5 w-3.5 shrink-0 rounded-full border-2 border-[#3C323A]" />
                   <span className="text-sm font-medium text-[#818181]">{label}</span>
                 </button>
