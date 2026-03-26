@@ -62,9 +62,9 @@ const ALL_SWAP_MODULES = [
 ] as const;
 
 const KNOWN_MODULES_LENDING = [
+  { key: "lending.morpho",   label: "Morpho",   hash: keccak256(encodePacked(["string"], ["lending.morpho"])) },
   { key: "lending.dolomite", label: "Dolomite", hash: keccak256(encodePacked(["string"], ["lending.dolomite"])) },
   { key: "lending.aave",     label: "Aave V3",  hash: keccak256(encodePacked(["string"], ["lending.aave"])) },
-  { key: "lending.morpho",   label: "Morpho",   hash: keccak256(encodePacked(["string"], ["lending.morpho"])) },
 ] as const;
 
 const KNOWN_MODULES_PERPS = [
