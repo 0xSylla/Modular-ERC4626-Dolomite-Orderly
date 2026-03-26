@@ -63,8 +63,8 @@ const ALL_SWAP_MODULES = [
 
 const KNOWN_MODULES_LENDING = [
   { key: "lending.morpho",   label: "Morpho",   hash: keccak256(encodePacked(["string"], ["lending.morpho"])) },
-  { key: "lending.dolomite", label: "Dolomite", hash: keccak256(encodePacked(["string"], ["lending.dolomite"])) },
   { key: "lending.aave",     label: "Aave V3",  hash: keccak256(encodePacked(["string"], ["lending.aave"])) },
+  { key: "lending.dolomite", label: "Dolomite", hash: keccak256(encodePacked(["string"], ["lending.dolomite"])) },
 ] as const;
 
 const KNOWN_MODULES_PERPS = [
@@ -557,15 +557,18 @@ export default function DeployV2Page() {
             <div className="flex flex-wrap gap-2">
               {availableLendingModules.map((m) => {
                 const isSelected = selectedLendingAddr === m.address;
+                const enabled = m.key === "lending.morpho";
                 return (
-                  <button key={m.key} onClick={() => setSelectedLendingAddr(m.address)}
+                  <button key={m.key} onClick={() => enabled && setSelectedLendingAddr(m.address)}
+                    disabled={!enabled}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                      !enabled ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default"
+                      : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
                     }`}>
                     <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
                       {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                     </div>
-                    <span className="text-sm font-medium text-white">{m.label}</span>
+                    <span className={`text-sm font-medium ${enabled ? "text-white" : "text-[#818181]"}`}>{m.label}</span>
                   </button>
                 );
               })}
@@ -583,15 +586,18 @@ export default function DeployV2Page() {
             <div className="flex flex-wrap gap-2">
               {availablePerpsModules.map((m) => {
                 const isSelected = selectedPerpsKey === m.key;
+                const enabled = m.key === "perps.gmx";
                 return (
-                  <button key={m.key} onClick={() => { setSelectedPerpsKey(m.key); setSelectedPerpsAddr(m.address); }}
+                  <button key={m.key} onClick={() => { if (enabled) { setSelectedPerpsKey(m.key); setSelectedPerpsAddr(m.address); } }}
+                    disabled={!enabled}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                      !enabled ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default"
+                      : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
                     }`}>
                     <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
                       {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                     </div>
-                    <span className="text-sm font-medium text-white">{m.label}</span>
+                    <span className={`text-sm font-medium ${enabled ? "text-white" : "text-[#818181]"}`}>{m.label}</span>
                   </button>
                 );
               })}
