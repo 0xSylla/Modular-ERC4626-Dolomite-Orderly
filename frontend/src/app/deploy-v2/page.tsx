@@ -43,7 +43,7 @@ interface TemplateInfo {
 const TEMPLATES: TemplateInfo[] = [
   {
     id: "delta-neutral-v1",
-    name: "Delta Neutral",
+    name: "Lending + Perps Delta Neutral",
     description:
       "Deposit USDC → delta-neutral exposure → capture yield\n\nCuration: Rebalancing · Execution · Funding regime\nYield sources: Staking · Lending · Funding",
     tags: ["Lending", "Perps Hedging", "Yield"],
@@ -427,7 +427,7 @@ export default function DeployV2Page() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-2">
-                      <h3 className="text-lg font-semibold text-white">{t.name}</h3>
+                      <h3 className="inline-block text-sm font-bold text-white bg-black/80 px-3 py-1 rounded-md">{t.name}</h3>
                       <p className="text-sm text-[#818181] leading-relaxed whitespace-pre-line">{t.description}</p>
                     </div>
                     <div className={`mt-1 h-5 w-5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07]" : "border-[#3C323A]"}`}>
@@ -440,11 +440,15 @@ export default function DeployV2Page() {
           </div>
 
           {/* Strategy Under Review cards */}
-          {[0, 1].map((i) => (
-            <div key={i} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "#2a2a2a" }}>
+          {[
+            { name: "RWA Strategy" },
+            { name: "Options Strategy" },
+          ].map((s) => (
+            <div key={s.name} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "#2a2a2a" }}>
               <div className="absolute inset-0" />
               <div className="relative p-5">
-                <h3 className="text-lg font-bold text-white">Strategy Under Review</h3>
+                <h3 className="inline-block text-sm font-bold text-white bg-black/80 px-3 py-1 rounded-md">{s.name}</h3>
+                <p className="text-xs font-semibold text-white mt-2 bg-black/60 inline-block px-2 py-0.5 rounded">Under Review</p>
                 <p className="text-sm text-[#FB5F07] mt-1.5">Submitted by strategists</p>
                 <p className="text-sm text-[#FB5F07]">Evaluated by Dirac quants</p>
               </div>
