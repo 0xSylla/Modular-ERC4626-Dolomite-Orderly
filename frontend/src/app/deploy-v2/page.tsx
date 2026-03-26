@@ -447,7 +447,7 @@ export default function DeployV2Page() {
             { name: "RWA Strategy" },
             { name: "Options Strategy" },
           ].map((s) => (
-            <div key={s.name} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "linear-gradient(135deg, #2a1530 0%, #3a1a3a 30%, #5a2555 60%, #7a3570 100%)" }}>
+            <div key={s.name} className="relative rounded-xl overflow-hidden border-l-4 border-[#FB5F07]/40" style={{ background: "rgba(60, 30, 50, 0.35)" }}>
               <div className="absolute inset-0" />
               <div className="relative p-5">
                 <h3 className="text-lg font-bold text-white">{s.name}</h3>
