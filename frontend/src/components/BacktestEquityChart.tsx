@@ -167,7 +167,7 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
       </div>
 
       {/* Performance & Costs Breakdown — side by side */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Performance Breakdown */}
         <div className="h-36">
           <div className="flex items-center gap-2 mb-1 px-1 flex-wrap">

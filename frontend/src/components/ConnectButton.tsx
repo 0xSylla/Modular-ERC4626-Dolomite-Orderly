@@ -62,7 +62,7 @@ export default function ConnectButton() {
   const styles = CHAIN_STYLES[currentChainId] ?? CHAIN_STYLES[DEFAULT_CHAIN.id];
 
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
       {/* Chain switcher — always visible */}
       <div className="relative" ref={dropdownRef}>
         <button

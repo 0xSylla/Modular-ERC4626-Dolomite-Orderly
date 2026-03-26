@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import Providers from "@/components/Providers";
 import ConnectButton from "@/components/ConnectButton";
+import MobileNav from "@/components/MobileNav";
 import "./globals.css";
 
 const nunito = Nunito({ subsets: ["latin"], variable: "--font-nunito" });
@@ -27,18 +28,20 @@ export default function RootLayout({
       >
         <Providers>
           <nav className="border-b sticky top-0 z-50 backdrop-blur-md" style={{ borderColor: "#3C323A", background: "rgba(0,0,0,0.4)" }}>
-            <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-8">
-                <Link href="/" className="flex items-center">
+            <div className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4 sm:gap-8">
+                <Link href="/" className="flex items-center shrink-0">
                   <Image
                     src="/logos/dirac-logos/dirac_finance_logo_WH.svg"
-                    width={140}
-                    height={40}
+                    width={110}
+                    height={32}
                     alt="Dirac Finance"
                     priority
+                    className="sm:w-[140px]"
                   />
                 </Link>
-                <div className="flex items-center gap-1 text-sm">
+                {/* Desktop nav */}
+                <div className="hidden sm:flex items-center gap-1 text-sm">
                   <Link
                     href="/"
                     className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
@@ -53,10 +56,15 @@ export default function RootLayout({
                   </Link>
                 </div>
               </div>
-              <ConnectButton />
+              <div className="flex items-center gap-2">
+                <div className="hidden sm:block">
+                  <ConnectButton />
+                </div>
+                <MobileNav />
+              </div>
             </div>
           </nav>
-          <main className="max-w-5xl mx-auto px-6 py-10">{children}</main>
+          <main className="max-w-5xl mx-auto px-3 sm:px-6 py-6 sm:py-10">{children}</main>
         </Providers>
       </body>
     </html>
