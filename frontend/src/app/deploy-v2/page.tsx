@@ -194,7 +194,8 @@ export default function DeployV2Page() {
   const availablePerpsModules = KNOWN_MODULES_PERPS.map((m) => ({
     ...m,
     address: (moduleData?.[moduleResultIdx++]?.result as string | undefined) ?? "",
-  })).filter((m) => m.address && m.address !== ZERO_ADDR);
+    registered: false as boolean,
+  })).map((m) => ({ ...m, registered: !!(m.address && m.address !== ZERO_ADDR) }));
 
   useEffect(() => {
     if (!selectedSwapAddr    && availableSwapModules[0])    setSelectedSwapAddr(availableSwapModules[0].address);
@@ -202,7 +203,7 @@ export default function DeployV2Page() {
       const morpho = availableLendingModules.find((m) => m.key === "lending.morpho");
       setSelectedLendingAddr(morpho ? morpho.address : availableLendingModules[0].address);
     }
-    if (!selectedPerpsAddr   && availablePerpsModules[0])   setSelectedPerpsAddr(availablePerpsModules[0].address);
+    if (!selectedPerpsAddr) { const first = availablePerpsModules.find((m) => m.registered); if (first) setSelectedPerpsAddr(first.address); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleData]);
 
@@ -563,16 +564,18 @@ export default function DeployV2Page() {
           >
             <div className="flex flex-wrap gap-2">
               {availablePerpsModules.map((m) => {
-                const isSelected = selectedPerpsAddr === m.address;
+                const isSelected = selectedPerpsAddr === m.address && m.registered;
                 return (
-                  <button key={m.key} onClick={() => setSelectedPerpsAddr(m.address)}
+                  <button key={m.key} onClick={() => m.registered && setSelectedPerpsAddr(m.address)}
+                    disabled={!m.registered}
                     className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-all ${
-                      isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
+                      !m.registered ? "border-[#3C323A] bg-[#252525]/30 opacity-40 cursor-default"
+                      : isSelected ? "border-[#FB5F07] bg-[#FB5F07]/10" : "border-[#3C323A] bg-[#252525]/50 hover:border-[#818181]"
                     }`}>
                     <div className={`h-3.5 w-3.5 shrink-0 rounded-full border-2 flex items-center justify-center ${isSelected ? "border-[#FB5F07] bg-[#FB5F07]" : "border-[#3C323A]"}`}>
                       {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-white" />}
                     </div>
-                    <span className="text-sm font-medium text-white">{m.label}</span>
+                    <span className={`text-sm font-medium ${m.registered ? "text-white" : "text-[#818181]"}`}>{m.label}</span>
                   </button>
                 );
               })}
@@ -596,10 +599,10 @@ export default function DeployV2Page() {
                   input[type=range]::-moz-range-track{height:8px;border-radius:4px;border:none;}
                   input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);margin-top:-6px;}
                   input[type=range]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:radial-gradient(circle at 40% 35%,#ffffff,#e0e0e0);border:2.5px solid rgba(255,255,255,0.9);cursor:pointer;box-shadow:0 0 0 4px rgba(255,255,255,0.15),0 2px 10px rgba(0,0,0,0.6);}
-                  .rb-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
-                  .rb-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
-                  .fr-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
-                  .fr-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#f0f0d0 90%,#88dd66 100%);}
+                  .rb-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#fff5e0 100%);}
+                  .rb-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#fff5e0 100%);}
+                  .fr-slider::-webkit-slider-runnable-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#fff5e0 100%);}
+                  .fr-slider::-moz-range-track{background:linear-gradient(90deg,#ff8800 0%,#ffaa33 25%,#ffcc66 50%,#ffe0a0 75%,#fff5e0 100%);}
                 `}</style>
 
                 {/* Rebalancing threshold slider */}
