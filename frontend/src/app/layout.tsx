@@ -49,10 +49,16 @@ export default function RootLayout({
                     Vaults Registry
                   </Link>
                   <Link
-                    href="/deploy-v2"
+                    href="/deploy"
                     className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
                   >
                     Deploy
+                  </Link>
+                  <Link
+                    href="/deploy-v2"
+                    className="px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+                  >
+                    Deploy v2
                   </Link>
                 </div>
               </div>

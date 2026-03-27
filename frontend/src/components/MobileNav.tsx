@@ -41,11 +41,18 @@ export default function MobileNav() {
               Vaults Registry
             </Link>
             <Link
-              href="/deploy-v2"
+              href="/deploy"
               onClick={() => setOpen(false)}
               className="block px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
             >
               Deploy
+            </Link>
+            <Link
+              href="/deploy-v2"
+              onClick={() => setOpen(false)}
+              className="block px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+            >
+              Deploy v2
             </Link>
             <div className="pt-2 border-t border-[#3C323A]">
               <ConnectButton />
