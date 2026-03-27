@@ -70,7 +70,7 @@ contract E2EArbDolomiteTest is Script {
             protocolFeeRecipient: deployer,
             daoFeeRecipient: deployer
         });
-        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer, fees);
+        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer);
         console.log("Factory:", address(factory));
 
         // --- 2. Modules ---

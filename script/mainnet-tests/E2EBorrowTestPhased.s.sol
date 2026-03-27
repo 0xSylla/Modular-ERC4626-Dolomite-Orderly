@@ -64,7 +64,7 @@ contract E2EBorrowTestPhased is Script {
             daoFeeRecipient: deployer
         });
 
-        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer, fees);
+        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer);
         DolomiteBeraModule dolomiteModule = new DolomiteBeraModule();
         KodiakModule kodiakModule = new KodiakModule();
         OrderlyModule orderlyModule = new OrderlyModule();

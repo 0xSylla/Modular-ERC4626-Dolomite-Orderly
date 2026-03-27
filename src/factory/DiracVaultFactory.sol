@@ -21,8 +21,6 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
     mapping(address => address[]) public vaultsByCurator;
     mapping(address => bool) private _isVault;
 
-    Data.ProtocolFees public protocolFees;
-
     mapping(bytes32 => address) public registeredModules;
     bytes32[] public moduleTypes;
 
@@ -44,14 +42,12 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
 
     constructor(
         address admin,
-        address _operator,
-        Data.ProtocolFees memory _protocolFees
+        address _operator
     ) {
         if (_operator == address(0)) revert Events.ZeroAddress();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(DIRAC_ADMIN_ROLE, admin);
         operator = _operator;
-        protocolFees = _protocolFees;
     }
 
     // ============ Vault Deployment ============
@@ -110,23 +106,6 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
 
     // ============ Protocol Fee Management ============
 
-    function setProtocolFee(
-        uint256 feeBps,
-        address recipient
-    ) external override onlyRole(DIRAC_ADMIN_ROLE) {
-        protocolFees.protocolFeeBps = feeBps;
-        protocolFees.protocolFeeRecipient = recipient;
-        emit Events.ProtocolFeeUpdated(feeBps, recipient);
-    }
-
-    function setDaoFee(
-        uint256 feeBps,
-        address recipient
-    ) external override onlyRole(DIRAC_ADMIN_ROLE) {
-        protocolFees.daoFeeBps = feeBps;
-        protocolFees.daoFeeRecipient = recipient;
-        emit Events.DaoFeeUpdated(feeBps, recipient);
-    }
 
     // ============ Deposit Token Whitelisting ============
 
@@ -298,8 +277,8 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
         DiracVault(payable(vault)).revokeRole(keccak256("OPERATOR_ROLE"), _operator);
     }
 
+
     /// @notice Grant CURATOR_ROLE to an additional address on a specific vault.
-    ///         Used to authorize the router as curator.
     function grantVaultCurator(
         address vault,
         address _curator
@@ -363,26 +342,6 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
         emit Events.EmergencyAction(vault, "endCycle");
     }
 
-    function emergencyExecute(
-        address vault,
-        bytes32 moduleType,
-        bytes calldata data
-    ) external payable override onlyRole(DIRAC_ADMIN_ROLE) {
-        if (!_isVault[vault]) revert Events.NotFactoryVault();
-        DiracVault(payable(vault)).emergencyExecuteModule{value: msg.value}(moduleType, data);
-        emit Events.EmergencyAction(vault, "executeModule");
-    }
-
-    /// @notice Rescue stuck tokens from a vault (OWNER_ROLE on vault = this factory)
-    function emergencyRescueToken(
-        address vault,
-        address token,
-        address to,
-        uint256 amount
-    ) external onlyRole(DIRAC_ADMIN_ROLE) {
-        if (!_isVault[vault]) revert Events.NotFactoryVault();
-        DiracVault(payable(vault)).emergencyRescueToken(token, to, amount);
-    }
 
     // ============ View Functions ============
     // Note: most state is public (auto-getters). Only functions needed by

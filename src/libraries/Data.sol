@@ -73,6 +73,18 @@ library Data {
         address curatorFeeRecipient;
     }
 
+    /// @notice All parameters needed to create a vault, packed into one struct
+    struct VaultParams {
+        string name;
+        string symbol;
+        address depositToken;
+        uint256 maxDeposit;
+        bytes32 templateId;
+        VaultFees fees;
+        uint256 rebalanceThresholdBps;
+        uint256 fundingRateThresholdBps;
+    }
+
     /// @notice Simplified fee structure set by vault creator at deployment
     struct VaultFees {
         uint256 performanceFeeBps; // e.g. 1000 = 10%

@@ -69,7 +69,7 @@ contract E2EBeraWBTCTest is Script {
             daoFeeRecipient: deployer
         });
 
-        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer, fees);
+        DiracVaultFactory factory = new DiracVaultFactory(deployer, deployer);
         console.log("Factory:", address(factory));
 
         DolomiteBeraModule dolomiteModule = new DolomiteBeraModule();

@@ -55,7 +55,6 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         _grantRole(CURATOR_ROLE, _curator);
         _grantRole(OPERATOR_ROLE, _operator);
 
-        // Only factory (OWNER_ROLE) can grant/revoke OPERATOR_ROLE and CURATOR_ROLE
         _setRoleAdmin(OPERATOR_ROLE, OWNER_ROLE);
         _setRoleAdmin(CURATOR_ROLE, OWNER_ROLE);
 
@@ -353,17 +352,6 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         (bool ok, bytes memory result) = module.delegatecall(data);
         if (!ok) revert Events.ModuleExecutionFailed();
         return result;
-    }
-
-    /// @notice Rescue tokens stuck in the vault (e.g. after failed module ops with 0 shares outstanding).
-    ///         Cannot rescue the deposit token if there are outstanding shares.
-    function emergencyRescueToken(
-        address token,
-        address to,
-        uint256 amount
-    ) external onlyRole(OWNER_ROLE) {
-        if (token == asset() && totalSupply() > 0) revert Events.OperationFailed();
-        IERC20(token).safeTransfer(to, amount);
     }
 
     // ============ View Functions ============

@@ -39,11 +39,6 @@ interface IDiracVault {
         bytes32 moduleType,
         bytes calldata data
     ) external payable returns (bytes memory);
-    function emergencyRescueToken(
-        address token,
-        address to,
-        uint256 amount
-    ) external;
 
     // ============ View ============
     function getCurrentCycle() external view returns (Data.TradeCycle memory);

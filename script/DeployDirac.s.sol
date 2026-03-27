@@ -79,14 +79,7 @@ contract DeployDirac is Script {
         // ======== 1. Deploy Factory ========
         console.log("--- Step 1: Deploy Factory ---");
 
-        Data.ProtocolFees memory fees = Data.ProtocolFees({
-            protocolFeeBps: 1000, // 10%
-            daoFeeBps: 300, // 3%
-            protocolFeeRecipient: protocolFeeRecipient,
-            daoFeeRecipient: daoFeeRecipient
-        });
-
-        DiracVaultFactory factory = new DiracVaultFactory(admin, operator, fees);
+        DiracVaultFactory factory = new DiracVaultFactory(admin, operator);
         console.log("Factory deployed at:", address(factory));
 
         // ======== 2. Deploy Modules ========

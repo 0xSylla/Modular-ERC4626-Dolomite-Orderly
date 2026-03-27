@@ -5,19 +5,10 @@ import {Data} from "../libraries/Data.sol";
 
 interface IDiracVaultFactory {
     function createVault(
-        string memory name,
-        string memory symbol,
-        address depositToken,
-        uint256 maxDeposit,
-        bytes32 templateId,
-        Data.VaultFees calldata vaultFees,
-        uint256 rebalanceThresholdBps,
-        uint256 fundingRateThresholdBps
+        string memory name, string memory symbol, address depositToken,
+        uint256 maxDeposit, bytes32 templateId, Data.VaultFees calldata vaultFees,
+        uint256 rebalanceThresholdBps, uint256 fundingRateThresholdBps
     ) external returns (address);
-
-    // Protocol fee management
-    function setProtocolFee(uint256 feeBps, address recipient) external;
-    function setDaoFee(uint256 feeBps, address recipient) external;
 
     // Asset whitelisting
     function whitelistDepositToken(address token) external;
@@ -44,17 +35,6 @@ interface IDiracVaultFactory {
     function emergencyPause(address vault) external;
     function emergencyUnpause(address vault) external;
     function emergencyEndCycle(address vault) external;
-    function emergencyExecute(
-        address vault,
-        bytes32 moduleType,
-        bytes calldata data
-    ) external payable;
-    function emergencyRescueToken(
-        address vault,
-        address token,
-        address to,
-        uint256 amount
-    ) external;
 
     // View
     function isVault(address vault) external view returns (bool);

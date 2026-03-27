@@ -585,4 +585,36 @@ export const vaultAbi = [
       { name: "shares", type: "uint256", indexed: false },
     ],
   },
+  // === Vault Fees & Thresholds ===
+  {
+    type: "function",
+    name: "getVaultFees",
+    inputs: [],
+    outputs: [
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "performanceFeeBps", type: "uint256" },
+          { name: "managementFeeBps", type: "uint256" },
+          { name: "feeRecipient", type: "address" },
+        ],
+      },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getRebalanceThresholdBps",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "getFundingRateThresholdBps",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
 ] as const;

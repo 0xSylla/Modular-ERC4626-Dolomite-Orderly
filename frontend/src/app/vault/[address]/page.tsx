@@ -730,6 +730,27 @@ export default function VaultPage({
     query: { enabled: !!userAddress, refetchInterval: 5000 },
   });
 
+  const { data: vaultFees } = useReadContract({
+    address: vaultAddr,
+    abi: vaultAbi,
+    functionName: "getVaultFees",
+    chainId: browsingChainId,
+  });
+
+  const { data: rebalanceThreshold } = useReadContract({
+    address: vaultAddr,
+    abi: vaultAbi,
+    functionName: "getRebalanceThresholdBps",
+    chainId: browsingChainId,
+  });
+
+  const { data: fundingRateThreshold } = useReadContract({
+    address: vaultAddr,
+    abi: vaultAbi,
+    functionName: "getFundingRateThresholdBps",
+    chainId: browsingChainId,
+  });
+
   // Extract cycle status
   const cycleStatus =
     cycleData !== undefined ? Number((cycleData as any).status ?? (cycleData as any)[0] ?? 0) : 0;
@@ -811,6 +832,22 @@ export default function VaultPage({
           <StatCard
             label="Name / Symbol"
             value={`${(vaultName as string) ?? "—"} / ${(vaultSymbol as string) ?? "—"}`}
+          />
+          <StatCard
+            label="Performance Fee"
+            value={vaultFees ? `${Number((vaultFees as any).performanceFeeBps ?? (vaultFees as any)[0] ?? 0) / 100}%` : "—"}
+          />
+          <StatCard
+            label="Management Fee"
+            value={vaultFees ? `${Number((vaultFees as any).managementFeeBps ?? (vaultFees as any)[1] ?? 0) / 100}%` : "—"}
+          />
+          <StatCard
+            label="Rebalance Threshold"
+            value={rebalanceThreshold !== undefined ? `${Number(rebalanceThreshold) / 100}%` : "—"}
+          />
+          <StatCard
+            label="Funding Rate Threshold"
+            value={fundingRateThreshold !== undefined ? (Number(fundingRateThreshold) === 0 ? "Off" : `${Number(fundingRateThreshold) / 100}%`) : "—"}
           />
         </div>
 
