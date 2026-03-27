@@ -67,7 +67,9 @@ contract E2EDualDolomiteTest is Script {
             USDC,
             10_000_000_000e6,
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({ curatorFeeBps: 200, curatorFeeRecipient: deployer })
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
         console.log("iBGT Vault:", ibgtVault);
 
@@ -82,7 +84,9 @@ contract E2EDualDolomiteTest is Script {
             USDC,
             10_000_000_000e6,
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({ curatorFeeBps: 200, curatorFeeRecipient: deployer })
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
         console.log("WETH Vault:", wethVault);
 

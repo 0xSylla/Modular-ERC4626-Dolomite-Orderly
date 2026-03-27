@@ -44,7 +44,7 @@ library Events {
     event PositionRebalancing(uint256 indexed positionId);
     event PositionRebalanced(uint256 indexed positionId);
     event ModuleExecuted(address indexed module, bool success);
-    event FeesCollected(uint256 protocolFee, uint256 daoFee, uint256 curatorFee);
+    event FeesCollected(uint256 performanceFee, uint256 managementFee, uint256 totalFees);
     event MaxDepositUpdated(uint256 newMaxDeposit);
 
     // ============ Module Events ============

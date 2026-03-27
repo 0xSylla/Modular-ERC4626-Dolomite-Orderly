@@ -83,7 +83,9 @@ contract E2EBorrowTestPhased is Script {
         address vaultAddr = factory.createVault(
             "Dirac Borrow Test", "dBRW", USDC, 1_000_000e6,
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({curatorFeeBps: 200, curatorFeeRecipient: deployer})
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
 
         vm.stopBroadcast();

@@ -71,7 +71,9 @@ contract E2EOrderlyTest is Script {
         address vaultAddr = factory.createVault(
             "Dirac Orderly Test", "dORD", USDC, 1_000_000e6,
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({curatorFeeBps: 200, curatorFeeRecipient: deployer})
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
         DiracVault vault = DiracVault(payable(vaultAddr));
         // deployer already has OPERATOR_ROLE (factory auto-grants to deployer)

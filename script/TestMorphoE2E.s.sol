@@ -94,7 +94,9 @@ contract TestMorphoE2E is Script {
             USDC,
             type(uint256).max,
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({curatorFeeBps: 0, curatorFeeRecipient: deployer})
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
         console.log("Vault created at:", vault);
 

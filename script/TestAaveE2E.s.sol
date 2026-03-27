@@ -54,7 +54,8 @@ contract TestAaveE2E is Script {
             USDC,
             1e6, // 1 USDC max deposit (tiny test)
             templateId,
-            Data.CuratorFeeConfig({ curatorFeeBps: 0, curatorFeeRecipient: admin })
+            Data.VaultFees({ performanceFeeBps: 0, managementFeeBps: 0, feeRecipient: admin }),
+            0, 0
         );
         console.log("Vault created:", vault);
 

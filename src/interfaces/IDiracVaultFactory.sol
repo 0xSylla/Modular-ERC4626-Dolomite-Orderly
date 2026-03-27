@@ -10,7 +10,9 @@ interface IDiracVaultFactory {
         address depositToken,
         uint256 maxDeposit,
         bytes32 templateId,
-        Data.CuratorFeeConfig calldata curatorFee
+        Data.VaultFees calldata vaultFees,
+        uint256 rebalanceThresholdBps,
+        uint256 fundingRateThresholdBps
     ) external returns (address);
 
     // Protocol fee management

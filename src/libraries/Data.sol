@@ -72,4 +72,11 @@ library Data {
         uint256 curatorFeeBps; // max 200 = 2%
         address curatorFeeRecipient;
     }
+
+    /// @notice Simplified fee structure set by vault creator at deployment
+    struct VaultFees {
+        uint256 performanceFeeBps; // e.g. 1000 = 10%
+        uint256 managementFeeBps;  // e.g. 50 = 0.5%
+        address feeRecipient;
+    }
 }

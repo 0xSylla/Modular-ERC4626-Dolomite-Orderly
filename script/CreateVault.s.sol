@@ -41,10 +41,9 @@ contract CreateVault is Script {
             depositToken,
             maxDeposit,
             templateId,
-            Data.CuratorFeeConfig({
-                curatorFeeBps: curatorFeeBps,
-                curatorFeeRecipient: curatorAddr
-            })
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: curatorAddr }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
 
         console.log("Vault deployed at:", vault);

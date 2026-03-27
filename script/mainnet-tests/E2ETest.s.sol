@@ -85,10 +85,9 @@ contract E2ETest is Script {
             USDC,
             1_000_000e6, // 1M USDC max
             keccak256("delta-neutral-v1"),
-            Data.CuratorFeeConfig({
-                curatorFeeBps: 200,
-                curatorFeeRecipient: deployer
-            })
+            Data.VaultFees({ performanceFeeBps: 1000, managementFeeBps: 50, feeRecipient: deployer }),
+            0, // rebalanceThresholdBps
+            0  // fundingRateThresholdBps
         );
         DiracVault vault = DiracVault(payable(vaultAddr));
         console.log("Vault created:", vaultAddr);

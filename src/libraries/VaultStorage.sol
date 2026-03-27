@@ -12,7 +12,10 @@ library VaultStorage {
         uint256 totalUsers;
         Data.CuratorFeeConfig curatorFee;
         Data.ProtocolFees protocolFees;
+        Data.VaultFees vaultFees;
         Data.TradeCycle currentCycle;
+        uint256 rebalanceThresholdBps;   // e.g. 2500 = 25%, 0 = disabled
+        uint256 fundingRateThresholdBps; // e.g. 50 = 0.5%, 0 = disabled
         mapping(address => uint256) userDeposits;
         mapping(bytes32 => bool) whitelistedModuleTypes;
         mapping(address => bool) vaultTargetAssets;

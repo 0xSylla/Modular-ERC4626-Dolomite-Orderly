@@ -62,12 +62,12 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
         address depositToken,
         uint256 maxDeposit,
         bytes32 templateId,
-        Data.CuratorFeeConfig calldata curatorFee
+        Data.VaultFees calldata vaultFees,
+        uint256 rebalanceThresholdBps,
+        uint256 fundingRateThresholdBps
     ) external override returns (address) {
         if (!whitelistedDepositTokens[depositToken])
             revert Events.DepositTokenNotWhitelisted();
-        if (curatorFee.curatorFeeBps > 200)
-            revert Events.CuratorFeeExceedsCap();
         if (!registeredTemplates[templateId])
             revert Events.TemplateNotRegistered();
 
@@ -80,8 +80,9 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
             symbol,
             maxDeposit,
             templateId,
-            curatorFee,
-            protocolFees,
+            vaultFees,
+            rebalanceThresholdBps,
+            fundingRateThresholdBps,
             moduleTypes
         );
 

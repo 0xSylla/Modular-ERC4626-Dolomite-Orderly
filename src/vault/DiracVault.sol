@@ -42,8 +42,9 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         string memory _symbol,
         uint256 _maxDeposit,
         bytes32 _templateId,
-        Data.CuratorFeeConfig memory _curatorFee,
-        Data.ProtocolFees memory _protocolFees,
+        Data.VaultFees memory _vaultFees,
+        uint256 _rebalanceThresholdBps,
+        uint256 _fundingRateThresholdBps,
         bytes32[] memory _moduleTypes
     ) ERC4626(IERC20(_depositToken)) ERC20(_name, _symbol) {
         if (_factory == address(0)) revert Events.ZeroAddress();
@@ -60,8 +61,9 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
 
         VaultStorage.Layout storage vs = VaultStorage.layout();
         vs.maxDeposit = _maxDeposit;
-        vs.curatorFee = _curatorFee;
-        vs.protocolFees = _protocolFees;
+        vs.vaultFees = _vaultFees;
+        vs.rebalanceThresholdBps = _rebalanceThresholdBps;
+        vs.fundingRateThresholdBps = _fundingRateThresholdBps;
 
         for (uint256 i = 0; i < _moduleTypes.length; i++) {
             vs.whitelistedModuleTypes[_moduleTypes[i]] = true;
@@ -402,6 +404,18 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
         return VaultStorage.layout().userDeposits[user];
     }
 
+    function getVaultFees() external view returns (Data.VaultFees memory) {
+        return VaultStorage.layout().vaultFees;
+    }
+
+    function getRebalanceThresholdBps() external view returns (uint256) {
+        return VaultStorage.layout().rebalanceThresholdBps;
+    }
+
+    function getFundingRateThresholdBps() external view returns (uint256) {
+        return VaultStorage.layout().fundingRateThresholdBps;
+    }
+
     // ============ Internal ============
 
     function _requireDepositOpen(
@@ -425,35 +439,20 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
 
         uint256 profit = currentAssets - startAssets;
 
-        uint256 totalFeeBps = vs.protocolFees.protocolFeeBps
-            + vs.protocolFees.daoFeeBps
-            + vs.curatorFee.curatorFeeBps;
-        if (totalFeeBps > 5_000) revert Events.TotalFeesExceedCap(); // max 50%
+        // Performance fee on profit
+        uint256 perfFee = (profit * vs.vaultFees.performanceFeeBps) / 10_000;
 
-        uint256 protocolCut = (profit * vs.protocolFees.protocolFeeBps) / 10_000;
-        uint256 daoCut = (profit * vs.protocolFees.daoFeeBps) / 10_000;
-        uint256 curatorCut = (profit * vs.curatorFee.curatorFeeBps) / 10_000;
-        uint256 totalFees = protocolCut + daoCut + curatorCut;
+        // Management fee on total assets (annualized, applied per cycle)
+        // Simplified: charge full mgmt fee per cycle close
+        uint256 mgmtFee = (currentAssets * vs.vaultFees.managementFeeBps) / 10_000;
+
+        uint256 totalFees = perfFee + mgmtFee;
+        if (totalFees > profit) totalFees = profit; // never take more than profit
 
         IERC20 depositToken = IERC20(asset());
 
-        if (protocolCut > 0) {
-            depositToken.safeTransfer(
-                vs.protocolFees.protocolFeeRecipient,
-                protocolCut
-            );
-        }
-        if (daoCut > 0) {
-            depositToken.safeTransfer(
-                vs.protocolFees.daoFeeRecipient,
-                daoCut
-            );
-        }
-        if (curatorCut > 0) {
-            depositToken.safeTransfer(
-                vs.curatorFee.curatorFeeRecipient,
-                curatorCut
-            );
+        if (totalFees > 0 && vs.vaultFees.feeRecipient != address(0)) {
+            depositToken.safeTransfer(vs.vaultFees.feeRecipient, totalFees);
         }
 
         // Adjust totalTVL to reflect fees leaving the vault
@@ -463,7 +462,7 @@ contract DiracVault is ERC4626, AccessControl, ReentrancyGuard, Pausable, IDirac
             vs.totalTVL = 0;
         }
 
-        emit Events.FeesCollected(protocolCut, daoCut, curatorCut);
+        emit Events.FeesCollected(perfFee, mgmtFee, totalFees);
     }
 
     /// @notice Receive ETH (gas refunds)
