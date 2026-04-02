@@ -1,6 +1,6 @@
-import { keccak256, toHex, type Address, encodeFunctionData } from "viem";
+import { keccak256, toHex, type Address, type Hex, encodeFunctionData } from "viem";
 import { kodiakModuleAbi, dolomiteModuleAbi, orderlyModuleAbi } from "../abis/modules";
-import type { PositionRecord } from "./blockchain";
+import type { PositionRecord, VaultLegs } from "./blockchain";
 import type { SwapQuote } from "./swap";
 import { config } from "../config";
 
@@ -55,6 +55,7 @@ export function getTemplate(templateId: string): TemplateRecipe {
 
 interface OpenContext {
   position: PositionRecord;
+  legs: VaultLegs;
   swapQuote: SwapQuote;
   borrowAmount: bigint;
   orderlyDepositData: {
@@ -68,17 +69,18 @@ interface OpenContext {
 
 interface CloseContext {
   position: PositionRecord;
+  legs: VaultLegs;
   swapQuote: SwapQuote; // OogaBooga quote for collateral → USDC (used by repayDebtWithCollateral)
 }
 
-function legToModule(leg: LegKey, position: PositionRecord): Address {
+function legToModule(leg: LegKey, legs: VaultLegs): Hex {
   switch (leg) {
     case "swap":
-      return position.legs.swapModule;
+      return legs.swapModuleType;
     case "lending":
-      return position.legs.lendingModule;
+      return legs.lendingModuleType;
     case "perps":
-      return position.legs.perpsModule;
+      return legs.perpsModuleType;
   }
 }
 
@@ -180,13 +182,13 @@ function buildCloseStepCalldata(
 export function buildOpenModulesAndData(
   templateId: string,
   ctx: OpenContext
-): { modules: Address[]; datas: `0x${string}`[] } {
+): { modules: Hex[]; datas: `0x${string}`[] } {
   const recipe = getTemplate(templateId);
-  const modules: Address[] = [];
+  const modules: Hex[] = [];
   const datas: `0x${string}`[] = [];
 
   for (const step of recipe.open) {
-    modules.push(legToModule(step.leg, ctx.position));
+    modules.push(legToModule(step.leg, ctx.legs));
     datas.push(buildOpenStepCalldata(step, ctx));
   }
 
@@ -196,13 +198,13 @@ export function buildOpenModulesAndData(
 export function buildCloseModulesAndData(
   templateId: string,
   ctx: CloseContext
-): { modules: Address[]; datas: `0x${string}`[] } {
+): { modules: Hex[]; datas: `0x${string}`[] } {
   const recipe = getTemplate(templateId);
-  const modules: Address[] = [];
+  const modules: Hex[] = [];
   const datas: `0x${string}`[] = [];
 
   for (const step of recipe.close) {
-    modules.push(legToModule(step.leg, ctx.position));
+    modules.push(legToModule(step.leg, ctx.legs));
     datas.push(buildCloseStepCalldata(step, ctx));
   }
 

@@ -17,17 +17,7 @@ export const routerAbi = [
           { name: "collateralAsset", type: "address" },
           { name: "perpsAsset", type: "string" },
           { name: "allocation", type: "uint256" },
-          { name: "rebalanceThresholdBps", type: "uint256" },
           { name: "status", type: "uint8" },
-          {
-            name: "legs",
-            type: "tuple",
-            components: [
-              { name: "swapModule", type: "address" },
-              { name: "lendingModule", type: "address" },
-              { name: "perpsModule", type: "address" },
-            ],
-          },
         ],
       },
     ],
@@ -39,7 +29,7 @@ export const routerAbi = [
     inputs: [
       { name: "vault", type: "address" },
       { name: "positionId", type: "uint256" },
-      { name: "modules", type: "address[]" },
+      { name: "moduleTypes", type: "bytes32[]" },
       { name: "datas", type: "bytes[]" },
     ],
     outputs: [{ name: "results", type: "bytes[]" }],
@@ -61,7 +51,7 @@ export const routerAbi = [
     inputs: [
       { name: "vault", type: "address" },
       { name: "positionId", type: "uint256" },
-      { name: "modules", type: "address[]" },
+      { name: "moduleTypes", type: "bytes32[]" },
       { name: "datas", type: "bytes[]" },
     ],
     outputs: [{ name: "results", type: "bytes[]" }],
@@ -73,7 +63,7 @@ export const routerAbi = [
     inputs: [
       { name: "vault", type: "address" },
       { name: "positionId", type: "uint256" },
-      { name: "modules", type: "address[]" },
+      { name: "moduleTypes", type: "bytes32[]" },
       { name: "datas", type: "bytes[]" },
     ],
     outputs: [{ name: "results", type: "bytes[]" }],
@@ -85,7 +75,7 @@ export const routerAbi = [
     inputs: [
       { name: "vault", type: "address" },
       { name: "positionId", type: "uint256" },
-      { name: "modules", type: "address[]" },
+      { name: "moduleTypes", type: "bytes32[]" },
       { name: "datas", type: "bytes[]" },
     ],
     outputs: [{ name: "results", type: "bytes[]" }],
@@ -96,7 +86,7 @@ export const routerAbi = [
     name: "setupModule",
     inputs: [
       { name: "vault", type: "address" },
-      { name: "module", type: "address" },
+      { name: "moduleType", type: "bytes32" },
       { name: "data", type: "bytes" },
     ],
     outputs: [{ name: "", type: "bytes" }],
@@ -107,7 +97,7 @@ export const routerAbi = [
     name: "executeModule",
     inputs: [
       { name: "vault", type: "address" },
-      { name: "module", type: "address" },
+      { name: "moduleType", type: "bytes32" },
       { name: "data", type: "bytes" },
     ],
     outputs: [{ name: "", type: "bytes" }],
@@ -118,7 +108,7 @@ export const routerAbi = [
     name: "executeBatch",
     inputs: [
       { name: "vault", type: "address" },
-      { name: "modules", type: "address[]" },
+      { name: "moduleTypes", type: "bytes32[]" },
       { name: "datas", type: "bytes[]" },
     ],
     outputs: [{ name: "results", type: "bytes[]" }],
@@ -140,5 +130,16 @@ export const routerAbi = [
     ],
     outputs: [],
     stateMutability: "nonpayable",
+  },
+  {
+    type: "function",
+    name: "vaultLegs",
+    inputs: [{ name: "vault", type: "address" }],
+    outputs: [
+      { name: "swapModuleType", type: "bytes32" },
+      { name: "lendingModuleType", type: "bytes32" },
+      { name: "perpsModuleType", type: "bytes32" },
+    ],
+    stateMutability: "view",
   },
 ] as const;

@@ -3,7 +3,7 @@ export const vaultAbi = [
     "type": "function",
     "name": "executeModule",
     "inputs": [
-      { "name": "module", "type": "address", "internalType": "address" },
+      { "name": "moduleType", "type": "bytes32", "internalType": "bytes32" },
       { "name": "data", "type": "bytes", "internalType": "bytes" }
     ],
     "outputs": [{ "name": "", "type": "bytes", "internalType": "bytes" }],
@@ -13,7 +13,7 @@ export const vaultAbi = [
     "type": "function",
     "name": "executeBatch",
     "inputs": [
-      { "name": "modules", "type": "address[]", "internalType": "address[]" },
+      { "name": "moduleTypes", "type": "bytes32[]", "internalType": "bytes32[]" },
       { "name": "datas", "type": "bytes[]", "internalType": "bytes[]" }
     ],
     "outputs": [{ "name": "results", "type": "bytes[]", "internalType": "bytes[]" }],

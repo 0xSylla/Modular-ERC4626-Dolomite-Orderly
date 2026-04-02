@@ -66,7 +66,23 @@ interface IMorpho {
             uint128 collateral
         );
 
+    /// @notice Returns the market state
+    function market(bytes32 id)
+        external view returns (
+            uint128 totalSupplyAssets,
+            uint128 totalSupplyShares,
+            uint128 totalBorrowAssets,
+            uint128 totalBorrowShares,
+            uint128 lastUpdate,
+            uint128 fee
+        );
+
     /// @notice Returns the market ID for a given MarketParams
     function idToMarketParams(bytes32 id)
         external view returns (MarketParams memory);
+}
+
+/// @dev Morpho oracle interface — returns price with 36 decimals of precision
+interface IMorphoOracle {
+    function price() external view returns (uint256);
 }

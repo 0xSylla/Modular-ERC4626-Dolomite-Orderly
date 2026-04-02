@@ -4,6 +4,7 @@ import {
   http,
   encodeFunctionData,
   type Address,
+  type Hex,
   type Chain,
   keccak256,
   toHex,
@@ -68,7 +69,10 @@ export function getWalletClient(chainId: number) {
 
 export const MODULE_TYPES = {
   SWAP_KODIAK: keccak256(toHex("swap.kodiak")),
+  SWAP_ODOS: keccak256(toHex("swap.odos")),
   LENDING_DOLOMITE: keccak256(toHex("lending.dolomite")),
+  LENDING_AAVE: keccak256(toHex("lending.aave")),
+  LENDING_MORPHO: keccak256(toHex("lending.morpho")),
   PERPS_ORDERLY: keccak256(toHex("perps.orderly")),
 } as const;
 
@@ -103,13 +107,7 @@ export interface PositionRecord {
   collateralAsset: Address;
   perpsAsset: string;
   allocation: bigint;
-  rebalanceThresholdBps: bigint;
   status: number;
-  legs: {
-    swapModule: Address;
-    lendingModule: Address;
-    perpsModule: Address;
-  };
 }
 
 export async function getVaultInfo(chainId: number, vault: Address): Promise<VaultInfo> {
@@ -138,6 +136,23 @@ export async function getPosition(
   return result as unknown as PositionRecord;
 }
 
+export interface VaultLegs {
+  swapModuleType: Hex;
+  lendingModuleType: Hex;
+  perpsModuleType: Hex;
+}
+
+export async function getVaultLegs(chainId: number, vault: Address): Promise<VaultLegs> {
+  const cfg = getChainConfig(chainId);
+  const [swapModuleType, lendingModuleType, perpsModuleType] = await getPublicClient(chainId).readContract({
+    address: cfg.routerAddr,
+    abi: routerAbi,
+    functionName: "vaultLegs",
+    args: [vault],
+  }) as [Hex, Hex, Hex];
+  return { swapModuleType, lendingModuleType, perpsModuleType };
+}
+
 export async function getStrategyAssetInfo(chainId: number, token: Address) {
   const cfg = getChainConfig(chainId);
   return getPublicClient(chainId).readContract({
@@ -164,16 +179,19 @@ export async function executeOpeningRequest(
   chainId: number,
   vault: Address,
   positionId: bigint,
-  modules: Address[],
+  modules: Hex[],
   datas: `0x${string}`[],
   value = 0n
 ) {
   const cfg = getChainConfig(chainId);
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "executeOpeningRequest",
     args: [vault, positionId, modules, datas],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
     value,
   });
   const receipt = await waitForReceipt(chainId, hash);
@@ -182,11 +200,14 @@ export async function executeOpeningRequest(
 
 export async function confirmOpen(chainId: number, vault: Address, positionId: bigint) {
   const cfg = getChainConfig(chainId);
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "confirmOpen",
     args: [vault, positionId],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
   });
   const receipt = await waitForReceipt(chainId, hash);
   return { hash, receipt };
@@ -196,16 +217,19 @@ export async function executeClosingRequest(
   chainId: number,
   vault: Address,
   positionId: bigint,
-  modules: Address[],
+  modules: Hex[],
   datas: `0x${string}`[],
   value = 0n
 ) {
   const cfg = getChainConfig(chainId);
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "executeClosingRequest",
     args: [vault, positionId, modules, datas],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
     value,
   });
   const receipt = await waitForReceipt(chainId, hash);
@@ -216,16 +240,19 @@ export async function executeRebalanceClose(
   chainId: number,
   vault: Address,
   positionId: bigint,
-  modules: Address[],
+  modules: Hex[],
   datas: `0x${string}`[],
   value = 0n
 ) {
   const cfg = getChainConfig(chainId);
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "executeRebalanceClose",
     args: [vault, positionId, modules, datas],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
     value,
   });
   const receipt = await waitForReceipt(chainId, hash);
@@ -236,16 +263,19 @@ export async function executeRebalanceOpen(
   chainId: number,
   vault: Address,
   positionId: bigint,
-  modules: Address[],
+  modules: Hex[],
   datas: `0x${string}`[],
   value = 0n
 ) {
   const cfg = getChainConfig(chainId);
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "executeRebalanceOpen",
     args: [vault, positionId, modules, datas],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
     value,
   });
   const receipt = await waitForReceipt(chainId, hash);
@@ -278,18 +308,23 @@ export async function getOrderlyModuleAddress(chainId: number): Promise<Address>
 
 export async function initializeDolomite(chainId: number, vault: Address): Promise<string> {
   const cfg = getChainConfig(chainId);
-  const dolomiteModule = await getDolomiteModuleAddress(chainId);
+  console.log("[DEBUG] LENDING_DOLOMITE hash:", MODULE_TYPES.LENDING_DOLOMITE);
+  console.log("[DEBUG] Router:", cfg.routerAddr);
 
-  const calldata = encodeFunctionData({
+  const moduleCalldata = encodeFunctionData({
     abi: dolomiteModuleAbi,
     functionName: "initializeModule",
   });
 
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "setupModule",
-    args: [vault, dolomiteModule, calldata],
+    args: [vault, MODULE_TYPES.LENDING_DOLOMITE, moduleCalldata],
+  });
+
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
   });
 
   await waitForReceipt(chainId, hash);
@@ -298,19 +333,22 @@ export async function initializeDolomite(chainId: number, vault: Address): Promi
 
 export async function initializeOrderlyModule(chainId: number, vault: Address): Promise<string> {
   const cfg = getChainConfig(chainId);
-  const orderlyModule = await getOrderlyModuleAddress(chainId);
 
-  const calldata = encodeFunctionData({
+  const moduleCalldata = encodeFunctionData({
     abi: orderlyModuleAbi,
     functionName: "initializeModule",
     args: [cfg.orderlyVaultAddr],
   });
 
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
     functionName: "setupModule",
-    args: [vault, orderlyModule, calldata],
+    args: [vault, MODULE_TYPES.PERPS_ORDERLY, moduleCalldata],
+  });
+
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
   });
 
   await waitForReceipt(chainId, hash);

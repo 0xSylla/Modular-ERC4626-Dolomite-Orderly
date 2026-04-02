@@ -8,7 +8,15 @@ library Events {
     event VaultCreated(
         address indexed vault,
         address indexed curator,
-        address indexed depositToken
+        address indexed depositToken,
+        string name,
+        string symbol,
+        uint256 maxDeposit,
+        uint256 performanceFeeBps,
+        uint256 managementFeeBps,
+        address feeRecipient,
+        uint256 rebalanceThresholdBps,
+        uint256 fundingRateThresholdBps
     );
     event DepositTokenWhitelisted(address indexed token);
     event DepositTokenRemoved(address indexed token);

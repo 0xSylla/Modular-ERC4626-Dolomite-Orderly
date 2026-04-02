@@ -100,7 +100,12 @@ contract DiracVaultFactory is AccessControl, IDiracVaultFactory {
             deployedAt: block.timestamp
         });
 
-        emit Events.VaultCreated(vaultAddr, msg.sender, depositToken);
+        emit Events.VaultCreated(
+            vaultAddr, msg.sender, depositToken,
+            name, symbol, maxDeposit,
+            vaultFees.performanceFeeBps, vaultFees.managementFeeBps, vaultFees.feeRecipient,
+            rebalanceThresholdBps, fundingRateThresholdBps
+        );
         return vaultAddr;
     }
 

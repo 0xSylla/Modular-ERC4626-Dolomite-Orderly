@@ -33,9 +33,9 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
   },
   [berachain.id]: {
     name: "Berachain",
-    factory: "0xD1b62F897435491293161a46a0D5CD47dCeEbcc0",
-    curatorRouter: "0xCe3D4A56cDf37E379E992b42Aad0185622C23977",
-    userRouter: "0xFF613CE01fdC6Eca33cACcc49Ce0f7527b86932D",
+    factory: (process.env.NEXT_PUBLIC_FACTORY_ADDR_BERA || ZERO) as `0x${string}`,
+    curatorRouter: (process.env.NEXT_PUBLIC_ROUTER_ADDR_BERA || ZERO) as `0x${string}`,
+    userRouter: (process.env.NEXT_PUBLIC_USER_ROUTER_ADDR_BERA || ZERO) as `0x${string}`,
     USDC: "0x549943e04f40284185054145c6E4e9568C1D3241",
     strategyAssets: [
       { label: "iBGT", address: "0xac03CABA51e17c86c921E1f6CBFBdC91F8BB2E6b" },

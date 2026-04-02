@@ -2,6 +2,7 @@ import { type Address, keccak256, stringToHex, decodeAbiParameters } from "viem"
 import {
   getVaultInfo,
   getPosition,
+  getVaultLegs,
   getModuleLendingConfig,
   executeOpeningRequest,
   confirmOpen,
@@ -41,9 +42,10 @@ export async function executeOpen(
   try {
     getVaultCredentials(vault);
 
-    const [vaultInfo, position] = await Promise.all([
+    const [vaultInfo, position, legs] = await Promise.all([
       getVaultInfo(chainId, vault),
       getPosition(chainId, vault, positionId),
+      getVaultLegs(chainId, vault),
     ]);
 
     if (position.status !== 1) {
@@ -69,6 +71,7 @@ export async function executeOpen(
       vaultInfo.templateId,
       {
         position,
+        legs,
         swapQuote,
         borrowAmount,
         orderlyDepositData: {
@@ -216,9 +219,10 @@ async function runCloseFlow(
     const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
     swapQuote.collateralMarketId = collateralMarketId;
 
+    const legs = await getVaultLegs(chainId, vault);
     const { modules, datas } = buildCloseModulesAndData(
       vaultInfo.templateId,
-      { position, swapQuote }
+      { position, legs, swapQuote }
     );
 
     const { hash } = await executeClosingRequest(chainId, vault, positionId, modules, datas);
@@ -264,9 +268,10 @@ async function runRebalanceFlow(
 ) {
   try {
     const cfg = getChainConfig(chainId);
-    const [vaultInfo, position] = await Promise.all([
+    const [vaultInfo, position, legs] = await Promise.all([
       getVaultInfo(chainId, vault),
       getPosition(chainId, vault, positionId),
+      getVaultLegs(chainId, vault),
     ]);
 
     if (position.status !== 5) {
@@ -283,7 +288,7 @@ async function runRebalanceFlow(
 
     const { modules: closeModules, datas: closeDatas } = buildCloseModulesAndData(
       vaultInfo.templateId,
-      { position, swapQuote: closeSwapQuote }
+      { position, legs, swapQuote: closeSwapQuote }
     );
 
     const { hash: closeHash } = await executeRebalanceClose(chainId, vault, positionId, closeModules, closeDatas);
@@ -321,6 +326,7 @@ async function runRebalanceFlow(
       vaultInfo.templateId,
       {
         position,
+        legs,
         swapQuote: openSwapQuote,
         borrowAmount,
         orderlyDepositData: {

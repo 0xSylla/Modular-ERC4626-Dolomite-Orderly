@@ -82,12 +82,6 @@ export async function delegateSignerOnChain(chainId: number, vault: Address): Pr
   const brokerHash = keccak256(stringToHex(config.brokerId));
 
   const perpsModuleType = keccak256(stringToHex("perps.orderly"));
-  const perpsModule = await getPublicClient(chainId).readContract({
-    address: cfg.factoryAddr,
-    abi: [{ type: "function", name: "getModule", inputs: [{ name: "moduleType", type: "bytes32" }], outputs: [{ name: "", type: "address" }], stateMutability: "view" }] as const,
-    functionName: "getModule",
-    args: [perpsModuleType],
-  });
 
   const calldata = encodeFunctionData({
     abi: orderlyModuleAbi,
@@ -98,11 +92,15 @@ export async function delegateSignerOnChain(chainId: number, vault: Address): Pr
     }],
   });
 
-  const hash = await getWalletClient(chainId).writeContract({
-    address: cfg.routerAddr,
+  const txData = encodeFunctionData({
     abi: routerAbi,
-    functionName: "setupModule" as any,
-    args: [vault, perpsModule, calldata] as any,
+    functionName: "setupModule",
+    args: [vault, perpsModuleType, calldata],
+  });
+
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: cfg.routerAddr,
+    data: txData,
   });
 
   await getPublicClient(chainId).waitForTransactionReceipt({ hash });
