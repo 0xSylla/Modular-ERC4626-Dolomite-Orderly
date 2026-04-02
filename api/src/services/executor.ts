@@ -56,11 +56,21 @@ export async function executeOpen(
       chainId,
       cfg.tokens.USDC,
       position.collateralAsset,
-      position.allocation
+      position.allocation,
+      50,
+      vault
     );
-    const lendingConfigRaw = await getModuleLendingConfig(chainId, MODULE_TYPES.LENDING_DOLOMITE, position.collateralAsset);
-    const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
-    swapQuote.collateralMarketId = collateralMarketId;
+    // Read lending config using the vault's actual lending module type
+    const lendingConfigRaw = await getModuleLendingConfig(chainId, legs.lendingModuleType as `0x${string}`, position.collateralAsset);
+    if (lendingConfigRaw && lendingConfigRaw !== "0x") {
+      if (legs.lendingModuleType === MODULE_TYPES.LENDING_DOLOMITE) {
+        const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
+        swapQuote.collateralMarketId = collateralMarketId;
+      } else {
+        // Morpho/Aave — pass raw config for the template plugin to decode
+        swapQuote.lendingConfig = lendingConfigRaw;
+      }
+    }
 
     const borrowAmount = estimateBorrowAmount(position.allocation);
 
@@ -74,6 +84,7 @@ export async function executeOpen(
         legs,
         swapQuote,
         borrowAmount,
+        chainId,
         orderlyDepositData: {
           accountId: accountId as `0x${string}`,
           brokerHash: brokerHash as `0x${string}`,
@@ -213,16 +224,24 @@ async function runCloseFlow(
       chainId,
       position.collateralAsset,
       cfg.tokens.USDC,
-      position.allocation
+      position.allocation,
+      50,
+      vault
     );
-    const lendingConfigRaw = await getModuleLendingConfig(chainId, MODULE_TYPES.LENDING_DOLOMITE, position.collateralAsset);
-    const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
-    swapQuote.collateralMarketId = collateralMarketId;
-
     const legs = await getVaultLegs(chainId, vault);
+    const lendingConfigRaw = await getModuleLendingConfig(chainId, legs.lendingModuleType as `0x${string}`, position.collateralAsset);
+    if (lendingConfigRaw && lendingConfigRaw !== "0x") {
+      if (legs.lendingModuleType === MODULE_TYPES.LENDING_DOLOMITE) {
+        const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
+        swapQuote.collateralMarketId = collateralMarketId;
+      } else {
+        swapQuote.lendingConfig = lendingConfigRaw;
+      }
+    }
+
     const { modules, datas } = buildCloseModulesAndData(
       vaultInfo.templateId,
-      { position, legs, swapQuote }
+      { position, legs, swapQuote, chainId }
     );
 
     const { hash } = await executeClosingRequest(chainId, vault, positionId, modules, datas);
@@ -278,17 +297,21 @@ async function runRebalanceFlow(
       throw new Error(`Position status is ${position.status}, expected 5 (REBALANCE_REQUESTED)`);
     }
 
-    const lendingConfigRaw = await getModuleLendingConfig(chainId, MODULE_TYPES.LENDING_DOLOMITE, position.collateralAsset);
-    const [collateralMarketId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
+    const lendingConfigRaw = await getModuleLendingConfig(chainId, legs.lendingModuleType as `0x${string}`, position.collateralAsset);
 
     // Step 1: Close on-chain legs
     updateJob(jobId, { status: "rebalance_closing_onchain" });
-    const closeSwapQuote = await getSwapQuote(chainId, position.collateralAsset, cfg.tokens.USDC, position.allocation);
-    closeSwapQuote.collateralMarketId = collateralMarketId;
+    const closeSwapQuote = await getSwapQuote(chainId, position.collateralAsset, cfg.tokens.USDC, position.allocation, 50, vault);
+    if (lendingConfigRaw && lendingConfigRaw !== "0x") {
+      if (legs.lendingModuleType === MODULE_TYPES.LENDING_DOLOMITE) {
+        const [mktId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
+        closeSwapQuote.collateralMarketId = mktId;
+      } else { closeSwapQuote.lendingConfig = lendingConfigRaw; }
+    }
 
     const { modules: closeModules, datas: closeDatas } = buildCloseModulesAndData(
       vaultInfo.templateId,
-      { position, legs, swapQuote: closeSwapQuote }
+      { position, legs, swapQuote: closeSwapQuote, chainId }
     );
 
     const { hash: closeHash } = await executeRebalanceClose(chainId, vault, positionId, closeModules, closeDatas);
@@ -315,8 +338,13 @@ async function runRebalanceFlow(
 
     // Step 4: Re-open on-chain legs
     updateJob(jobId, { status: "rebalance_opening_onchain" });
-    const openSwapQuote = await getSwapQuote(chainId, cfg.tokens.USDC, position.collateralAsset, position.allocation);
-    openSwapQuote.collateralMarketId = collateralMarketId;
+    const openSwapQuote = await getSwapQuote(chainId, cfg.tokens.USDC, position.collateralAsset, position.allocation, 50, vault);
+    if (lendingConfigRaw && lendingConfigRaw !== "0x") {
+      if (legs.lendingModuleType === MODULE_TYPES.LENDING_DOLOMITE) {
+        const [mktId] = decodeAbiParameters([{ type: "uint256" }], lendingConfigRaw);
+        openSwapQuote.collateralMarketId = mktId;
+      } else { openSwapQuote.lendingConfig = lendingConfigRaw; }
+    }
 
     const borrowAmount = estimateBorrowAmount(position.allocation);
     const accountId = computeAccountId(vault);
@@ -329,6 +357,7 @@ async function runRebalanceFlow(
         legs,
         swapQuote: openSwapQuote,
         borrowAmount,
+        chainId,
         orderlyDepositData: {
           accountId: accountId as `0x${string}`,
           brokerHash: brokerHash as `0x${string}`,

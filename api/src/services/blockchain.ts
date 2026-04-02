@@ -3,6 +3,7 @@ import {
   createWalletClient,
   http,
   encodeFunctionData,
+  decodeAbiParameters,
   type Address,
   type Hex,
   type Chain,
@@ -117,8 +118,14 @@ export async function getVaultInfo(chainId: number, vault: Address): Promise<Vau
     abi: factoryAbi,
     functionName: "vaultInfo",
     args: [vault],
-  });
-  return result as unknown as VaultInfo;
+  }) as any;
+  // Auto-getter returns flat array [vault, creator, templateId, deployedAt]
+  return {
+    vault: result[0] ?? result.vault,
+    creator: result[1] ?? result.creator,
+    templateId: result[2] ?? result.templateId,
+    deployedAt: result[3] ?? result.deployedAt,
+  } as VaultInfo;
 }
 
 export async function getPosition(
@@ -127,13 +134,48 @@ export async function getPosition(
   positionId: bigint
 ): Promise<PositionRecord> {
   const cfg = getChainConfig(chainId);
-  const result = await getPublicClient(chainId).readContract({
-    address: cfg.routerAddr,
+  const client = getPublicClient(chainId);
+
+  // Use raw eth_call + manual decode to avoid viem tuple decoding issues with string fields
+  const calldata = encodeFunctionData({
     abi: routerAbi,
     functionName: "getPosition",
     args: [vault, positionId],
   });
-  return result as unknown as PositionRecord;
+
+  const rawResult = await client.call({
+    to: cfg.routerAddr,
+    data: calldata,
+  });
+
+  if (!rawResult.data) throw new Error("getPosition returned empty data");
+
+  // Manual decode: skip first 32-byte offset pointer, then decode flat fields
+  const hex = rawResult.data.slice(2); // remove 0x
+  const word = (i: number) => hex.slice(i * 64, (i + 1) * 64);
+  const toNum = (w: string) => BigInt("0x" + w);
+  const toAddr = (w: string) => ("0x" + w.slice(24)) as Address;
+
+  // Word 0: offset (0x20 = 32, skip)
+  // Word 1: id
+  const id = toNum(word(1));
+  // Word 2: vault
+  const posVault = toAddr(word(2));
+  // Word 3: collateralAsset
+  const collateralAsset = toAddr(word(3));
+  // Word 4: offset to string data (relative to start of tuple = word 1)
+  const strOffset = Number(toNum(word(4))) / 32; // in words, relative to tuple start
+  // Word 5: allocation
+  const allocation = toNum(word(5));
+  // Word 6: status
+  const status = Number(toNum(word(6)));
+  // String: at word (1 + strOffset) = length, then data
+  const strLenWord = 1 + strOffset;
+  const strLen = Number(toNum(word(strLenWord)));
+  const strData = hex.slice((strLenWord + 1) * 64, (strLenWord + 1) * 64 + strLen * 2);
+  const perpsAsset = Buffer.from(strData, "hex").toString("utf8");
+
+  return { id, vault: posVault, collateralAsset, perpsAsset, allocation, status };
 }
 
 export interface VaultLegs {

@@ -7,6 +7,7 @@ export interface SwapQuote {
   minAmountOut: bigint;
   expectedAmountOut: bigint;
   collateralMarketId: bigint;
+  lendingConfig?: `0x${string}`; // Raw lending config for non-Dolomite modules
 }
 
 // ============ OogaBooga (Berachain) ============
