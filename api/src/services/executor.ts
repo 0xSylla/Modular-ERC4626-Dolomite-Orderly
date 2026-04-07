@@ -27,7 +27,11 @@ import { config, getChainConfig } from "../config";
 
 const POLL_INTERVAL_MS = 5_000;
 const POLL_MAX_ATTEMPTS = 120;
-const ORDERLY_DEPOSIT_FEE = 25000000000000000n; // 0.025 native token for LayerZero
+// LayerZero fee for Orderly deposit: Berachain needs cross-chain bridge fee, Arbitrum is native (0)
+function getOrderlyDepositFee(chainId: number): bigint {
+  if (chainId === 42161) return 0n;        // Arbitrum — native, no LZ fee
+  return 25000000000000000n;               // Berachain — 0.025 BERA for LayerZero
+}
 
 // ============ Open Position Flow ============
 
@@ -91,12 +95,12 @@ export async function executeOpen(
           tokenHash:
             "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" as `0x${string}`,
           tokenAmount: borrowAmount,
-          fee: ORDERLY_DEPOSIT_FEE,
+          fee: getOrderlyDepositFee(chainId),
         },
       }
     );
 
-    const { hash } = await executeOpeningRequest(chainId, vault, positionId, modules, datas, ORDERLY_DEPOSIT_FEE);
+    const { hash } = await executeOpeningRequest(chainId, vault, positionId, modules, datas, getOrderlyDepositFee(chainId));
     updateJob(job.id, { status: "waiting_deposit", txHash: hash });
 
     pollAndConfirmOpen(chainId, job.id, vault, positionId, position.perpsAsset, borrowAmount);
@@ -363,12 +367,12 @@ async function runRebalanceFlow(
           brokerHash: brokerHash as `0x${string}`,
           tokenHash: "0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa" as `0x${string}`,
           tokenAmount: borrowAmount,
-          fee: ORDERLY_DEPOSIT_FEE,
+          fee: getOrderlyDepositFee(chainId),
         },
       }
     );
 
-    const { hash: openHash } = await executeRebalanceOpen(chainId, vault, positionId, openModules, openDatas, ORDERLY_DEPOSIT_FEE);
+    const { hash: openHash } = await executeRebalanceOpen(chainId, vault, positionId, openModules, openDatas, getOrderlyDepositFee(chainId));
     updateJob(jobId, { status: "rebalance_opening_orderly", txHash: openHash });
 
     // Step 5: Poll Orderly deposit + reopen short

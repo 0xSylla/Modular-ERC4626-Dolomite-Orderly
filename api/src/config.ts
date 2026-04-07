@@ -75,7 +75,7 @@ const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     },
     swapApiUrl: env("SWAP_API_URL_ARB", "https://api.odos.xyz"),
     swapProvider: "odos",
-    orderlyVaultAddr: env("ORDERLY_VAULT_ADDR", "0x816f722424B49Cf1275cc86DA9840Fbd5a6167e9") as `0x${string}`,
+    orderlyVaultAddr: env("ORDERLY_VAULT_ADDR_ARB", "0xdc89a058030f39c964a966e4b6137374c95881cd") as `0x${string}`,
     orderlyLedgerContract: "0x6F7a338F2aA472838dEFD3283eB360d4Dff5D203" as `0x${string}`,
   },
 };
