@@ -14,15 +14,22 @@ import {
   vaultAbi,
   curatorRouterAbi,
   factoryAbi,
+  erc20Abi,
 } from "@/lib/contracts";
-import { formatUnits, parseUnits, parseEther } from "viem";
+import { useBrowsingChain } from "@/lib/ChainContext";
+import { useSwitchChain } from "wagmi";
+import { formatUnits, parseUnits, parseEther, keccak256, encodePacked } from "viem";
 import Link from "next/link";
 import {
+  initializeVault,
   openPosition as apiOpenPosition,
   closePosition as apiClosePosition,
   rebalancePosition as apiRebalancePosition,
+  getOrderlyStatus,
+  getMonitorState,
   pollJob,
   type Job,
+  type MonitorState,
 } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
@@ -59,6 +66,14 @@ const POSITION_STATUS_COLORS: Record<number, string> = {
 
 const TABS = ["Positions", "Setup"] as const;
 type Tab = (typeof TABS)[number];
+
+const ORDERLY_PERPS_HASH = keccak256(encodePacked(["string"], ["perps.orderly"]));
+
+// Orderly perps require notional ≥ min_notional (10 USDC for ETH-PERP). With our flow
+// `notional = allocation × 0.5 borrow × 2 leverage × 0.95 safety = allocation × 0.95`,
+// so the true floor is 10 / 0.95 ≈ 10.53 USDC. Setting 12 to leave a sliver of headroom
+// for funding/rounding. The API also enforces this with a clean error if exceeded.
+const ORDERLY_MIN_ALLOCATION_USDC = BigInt(12_000_000); // 12 USDC (6 decimals)
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -111,6 +126,148 @@ function TxStatus({
 }
 
 // ---------------------------------------------------------------------------
+// Monitor state panel — shows the funding monitor's view of a position
+// (mode, last evaluated funding MA, TP/SL algo id). Polls every 20s.
+// ---------------------------------------------------------------------------
+
+function MonitorStatePanel({
+  chainId,
+  vault,
+  positionId,
+}: {
+  chainId: number;
+  vault: `0x${string}`;
+  positionId: number;
+}) {
+  const [state, setState] = useState<MonitorState | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchState = async () => {
+      try {
+        const s = await getMonitorState(chainId, vault, positionId);
+        if (!cancelled) {
+          setState(s);
+          setError(null);
+        }
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "fetch failed");
+      }
+    };
+    fetchState();
+    const i = setInterval(fetchState, 20_000);
+    return () => {
+      cancelled = true;
+      clearInterval(i);
+    };
+  }, [chainId, vault, positionId]);
+
+  if (error || !state) return null;
+  if (!state.tracked) {
+    return (
+      <div className="mt-3 rounded-lg border border-slate-700/50 bg-slate-900/40 px-3 py-2 text-xs text-slate-400">
+        Funding monitor: not yet registered (will appear after the next successful open)
+      </div>
+    );
+  }
+
+  const modeColors: Record<string, string> = {
+    "ACTIVE": "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
+    "PAUSED-COLD": "bg-amber-500/20 text-amber-300 border-amber-500/40",
+    "PAUSED-WARM": "bg-amber-500/20 text-amber-300 border-amber-500/40",
+  };
+  const modeColor = modeColors[state.mode ?? ""] ?? "bg-slate-500/20 text-slate-300 border-slate-500/40";
+  const maText = Number.isFinite(state.lastEvalMaBps)
+    ? `${(state.lastEvalMaBps ?? 0).toFixed(3)} bps`
+    : "not yet evaluated";
+  const updatedSec = state.updatedAt ? Math.max(0, Math.round((Date.now() - state.updatedAt) / 1000)) : null;
+
+  return (
+    <div className="mt-3 rounded-lg border border-slate-700/60 bg-slate-900/50 px-3 py-2 space-y-1">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-slate-400">Funding monitor</span>
+        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${modeColor}`}>
+          {state.mode}
+        </span>
+      </div>
+      <div className="flex items-center justify-between text-[11px] text-slate-300">
+        <span>3-day MA funding: <span className="font-mono text-white">{maText}</span></span>
+        {state.entryPrice ? (
+          <span>Entry: <span className="font-mono text-white">${state.entryPrice.toFixed(2)}</span></span>
+        ) : null}
+      </div>
+      <div className="flex items-center justify-between text-[10px] text-slate-500">
+        <span>TP/SL algo: {state.algoOrderId ? <span className="font-mono text-slate-300">#{state.algoOrderId}</span> : "none"}</span>
+        {updatedSec !== null && <span>updated {updatedSec}s ago</span>}
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Orderly Init Button (reusable)
+// ---------------------------------------------------------------------------
+
+function OrderlyInitButton({
+  vault,
+  chainId,
+  onSuccess,
+}: {
+  vault: `0x${string}`;
+  chainId: number;
+  onSuccess?: () => void;
+}) {
+  const [status, setStatus] = useState<"idle" | "loading" | "success" | "failed">("idle");
+  const [message, setMessage] = useState("");
+  const [accountId, setAccountId] = useState("");
+
+  async function handleInit() {
+    setStatus("loading");
+    setMessage("");
+    try {
+      const res = await initializeVault(chainId, vault, 2);
+      setAccountId(res.accountId ?? "");
+      setMessage(res.message ?? "Vault initialized");
+      setStatus("success");
+      onSuccess?.();
+    } catch (e: any) {
+      setMessage(e?.message ?? "Failed");
+      setStatus("failed");
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={handleInit}
+        disabled={status === "loading"}
+        className="rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+      >
+        {status === "loading" ? (
+          <span className="flex items-center gap-2"><Spinner /> Initializing on Orderly...</span>
+        ) : status === "success" ? (
+          "Re-initialize on Orderly"
+        ) : (
+          "Initialize on Orderly"
+        )}
+      </button>
+      {status === "success" && (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300">
+          {message}
+          {accountId && <div className="mt-1 font-mono text-[10px] text-emerald-400">Account ID: {accountId}</div>}
+        </div>
+      )}
+      {status === "failed" && (
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-xs text-red-300 break-all">
+          {message}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main Page
 // ---------------------------------------------------------------------------
 
@@ -122,7 +279,9 @@ export default function ManagePage({
   const { address: vaultAddress } = React.use(params);
   const vault = vaultAddress as `0x${string}`;
   const { address: userAddress } = useAccount();
-  const chainId = useChainId();
+  const walletChainId = useChainId();
+  const { browsingChainId } = useBrowsingChain();
+  const chainId = browsingChainId;
   const addresses = useAddresses();
 
   const [activeTab, setActiveTab] = useState<Tab>("Positions");
@@ -147,6 +306,7 @@ export default function ManagePage({
     address: vault,
     abi: vaultAbi,
     functionName: "getCurrentCycle",
+    chainId,
   });
 
   const { data: totalAssets } = useReadContract({
@@ -161,6 +321,53 @@ export default function ManagePage({
     functionName: "name",
   });
 
+  // ---- Vault legs (to know which perps module is wired) ----
+  const { data: vaultLegsData } = useReadContract({
+    address: addresses.curatorRouter,
+    abi: curatorRouterAbi,
+    functionName: "vaultLegs",
+    args: [vault],
+    chainId,
+  });
+
+  // vaultLegs returns a tuple [swapModuleType, lendingModuleType, perpsModuleType]
+  const perpsModuleType = Array.isArray(vaultLegsData)
+    ? (vaultLegsData[2] as `0x${string}` | undefined)
+    : undefined;
+  const isOrderlyPerps =
+    perpsModuleType !== undefined &&
+    perpsModuleType.toLowerCase() === ORDERLY_PERPS_HASH.toLowerCase();
+
+  // ---- Vault USDC balance (for allocation pre-flight) ----
+  const { data: vaultUsdcBalance, refetch: refetchUsdcBalance } = useReadContract({
+    address: addresses.USDC,
+    abi: erc20Abi,
+    functionName: "balanceOf",
+    args: [vault],
+    chainId,
+  });
+
+  // ---- Orderly initialization status (only meaningful when perps module is Orderly) ----
+  // null = unknown/loading, true = initialized, false = not initialized
+  const [orderlyInitialized, setOrderlyInitialized] = useState<boolean | null>(null);
+
+  const refetchOrderlyStatus = useCallback(async () => {
+    if (!isOrderlyPerps) {
+      setOrderlyInitialized(null);
+      return;
+    }
+    try {
+      const { initialized } = await getOrderlyStatus(chainId, vault);
+      setOrderlyInitialized(initialized);
+    } catch {
+      // If the API is down, fall back to unknown — don't hard-block.
+      setOrderlyInitialized(null);
+    }
+  }, [chainId, vault, isOrderlyPerps]);
+
+  useEffect(() => {
+    refetchOrderlyStatus();
+  }, [refetchOrderlyStatus]);
 
   // ---- Position count ----
   const {
@@ -171,6 +378,7 @@ export default function ManagePage({
     abi: curatorRouterAbi,
     functionName: "getPositionsCount",
     args: [vault],
+    chainId,
   });
 
   const posCount = positionsCount ? Number(positionsCount) : 0;
@@ -181,6 +389,7 @@ export default function ManagePage({
     abi: curatorRouterAbi,
     functionName: "getPosition" as const,
     args: [vault, BigInt(i)] as const,
+    chainId,
   }));
 
   const {
@@ -212,15 +421,27 @@ export default function ManagePage({
       refetchCycle();
       refetchPositionsCount();
       refetchPositions();
+      refetchUsdcBalance();
     }
-  }, [txConfirmed, refetchCycle, refetchPositionsCount, refetchPositions]);
+  }, [txConfirmed, refetchCycle, refetchPositionsCount, refetchPositions, refetchUsdcBalance]);
 
   // ---- Helpers to fire write calls ----
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function fireAction(label: string, args: any) {
+  const { switchChainAsync } = useSwitchChain();
+
+  async function fireAction(label: string, args: any) {
     resetWrite();
     setLastAction(label);
-    writeContract(args);
+    // Auto-switch wallet to the vault's chain if needed
+    if (walletChainId !== chainId) {
+      try {
+        await switchChainAsync({ chainId });
+      } catch {
+        console.error("Failed to switch chain");
+        return;
+      }
+    }
+    writeContract({ ...args, chainId });
   }
 
   // ====================================================================
@@ -439,6 +660,27 @@ export default function ManagePage({
           </button>
         </div>
 
+        {/* Orderly Initialization */}
+        <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-6">
+          <h3 className="text-lg font-semibold text-white mb-2">Orderly Initialization</h3>
+          <p className="text-sm text-slate-400 mb-4">
+            Register this vault on Orderly Network (one-time setup). Required before opening any position with Orderly as the perps protocol.
+          </p>
+          {isOrderlyPerps && (
+            <div className="mb-3 text-xs">
+              Current status:{" "}
+              {orderlyInitialized === true ? (
+                <span className="text-emerald-400 font-semibold">Registered on Orderly</span>
+              ) : orderlyInitialized === false ? (
+                <span className="text-red-400 font-semibold">Not registered</span>
+              ) : (
+                <span className="text-slate-400">Checking…</span>
+              )}
+            </div>
+          )}
+          <OrderlyInitButton vault={vault} chainId={chainId} onSuccess={refetchOrderlyStatus} />
+        </div>
+
       </div>
     );
   }
@@ -530,8 +772,60 @@ export default function ManagePage({
     const waitingPositions = positions.filter((p) => Number(p.status) <= 1);
     const activePositions = positions.filter((p) => Number(p.status) >= 2);
 
+    // Pre-flight checks for opening a position via API.
+    // Returns a list of unmet prerequisite messages (empty array = ready to execute).
+    function getOpenPrereqIssues(pos: Position): string[] {
+      const issues: string[] = [];
+      if (cycleStatus !== 2) {
+        issues.push(
+          'Vault is not in TRADING state. Go to Setup → Trade Cycle and click "Start Trading".'
+        );
+      }
+      const usdcBal = (vaultUsdcBalance as bigint | undefined) ?? BigInt(0);
+      if (usdcBal < pos.allocation) {
+        const have = Number(formatUnits(usdcBal, 6)).toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+        });
+        const need = Number(formatUnits(pos.allocation, 6)).toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+        });
+        issues.push(
+          `Vault has insufficient USDC for this allocation (have ${have}, need ${need}).`
+        );
+      }
+      if (isOrderlyPerps && orderlyInitialized === false) {
+        issues.push(
+          'Vault is NOT registered on Orderly Network. Go to Setup → Orderly Initialization and click "Initialize on Orderly".'
+        );
+      } else if (isOrderlyPerps && orderlyInitialized === null) {
+        issues.push(
+          "Could not verify Orderly registration (API unreachable). Make sure the API is running and the vault has been initialized."
+        );
+      }
+      if (isOrderlyPerps && pos.allocation < ORDERLY_MIN_ALLOCATION_USDC) {
+        const minStr = Number(formatUnits(ORDERLY_MIN_ALLOCATION_USDC, 6)).toLocaleString();
+        const allocStr = Number(formatUnits(pos.allocation, 6)).toLocaleString(undefined, {
+          maximumFractionDigits: 4,
+        });
+        issues.push(
+          `Allocation (${allocStr} USDC) is below the Orderly minimum (${minStr} USDC). Orderly will reject the short order with "margin will be insufficient".`
+        );
+      }
+      return issues;
+    }
+
     function PositionCard({ pos }: { pos: Position }) {
       const status = Number(pos.status);
+      const prereqIssues = status === 1 ? getOpenPrereqIssues(pos) : [];
+      // Hard-block conditions: cycle not trading, insufficient USDC, Orderly not initialized,
+      // OR (Orderly perps and allocation below the Orderly minimum margin).
+      const usdcBal = (vaultUsdcBalance as bigint | undefined) ?? BigInt(0);
+      const hardBlock =
+        status === 1 &&
+        (cycleStatus !== 2 ||
+          usdcBal < pos.allocation ||
+          (isOrderlyPerps && orderlyInitialized === false) ||
+          (isOrderlyPerps && pos.allocation < ORDERLY_MIN_ALLOCATION_USDC));
       return (
         <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
           <div className="mb-3 flex flex-wrap items-center gap-3">
@@ -561,13 +855,18 @@ export default function ManagePage({
             <div>
               <p className="text-xs text-slate-400">Allocation</p>
               <p className="text-white">
-                {Number(formatUnits(pos.allocation, 18)).toLocaleString(
+                {Number(formatUnits(pos.allocation, 6)).toLocaleString(
                   undefined,
                   { maximumFractionDigits: 4 }
                 )}
               </p>
             </div>
           </div>
+
+          {/* Funding monitor state (only shown for in-flight positions) */}
+          {(status >= 2 && status <= 6) && (
+            <MonitorStatePanel chainId={chainId} vault={vault} positionId={Number(pos.id)} />
+          )}
 
           {/* Action buttons */}
           <div className="mt-4 flex flex-wrap gap-2">
@@ -591,13 +890,28 @@ export default function ManagePage({
 
             {/* OPEN_REQUESTED -> Execute via API */}
             {status === 1 && (
-              <button
-                disabled={!!activeJobId}
-                onClick={() => handleApiOpen(Number(pos.id))}
-                className="rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {activeJobId ? "Job running..." : "Execute Opening (API)"}
-              </button>
+              <div className="w-full space-y-2">
+                <button
+                  disabled={!!activeJobId || hardBlock}
+                  onClick={() => handleApiOpen(Number(pos.id))}
+                  title={hardBlock ? "Prerequisites not met — see warnings below." : undefined}
+                  className="rounded-lg bg-cyan-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-cyan-500 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {activeJobId ? "Job running..." : "Execute Opening (API)"}
+                </button>
+                {prereqIssues.length > 0 && (
+                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300 space-y-1">
+                    <div className="font-semibold">
+                      {hardBlock ? "Cannot execute yet — fix the following:" : "Heads up before executing:"}
+                    </div>
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {prereqIssues.map((m, i) => (
+                        <li key={i}>{m}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* OPENING -> Confirm Open */}
@@ -670,41 +984,16 @@ export default function ManagePage({
               </p>
             )}
 
-            {/* CLOSE_REQUESTED -> Execute via API */}
+            {/* CLOSE_REQUESTED -> Execute via API (closes full position automatically) */}
             {status === 4 && (
-              <div className="flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  placeholder="Short qty"
-                  className="w-24 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-white"
-                  id={`close-qty-${Number(pos.id)}`}
-                />
-                <input
-                  type="text"
-                  placeholder="Withdraw amt"
-                  className="w-24 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-xs text-white"
-                  id={`close-withdraw-${Number(pos.id)}`}
-                />
-                <button
-                  disabled={!!activeJobId}
-                  onClick={() => {
-                    const qty = (
-                      document.getElementById(
-                        `close-qty-${Number(pos.id)}`
-                      ) as HTMLInputElement
-                    )?.value;
-                    const amt = (
-                      document.getElementById(
-                        `close-withdraw-${Number(pos.id)}`
-                      ) as HTMLInputElement
-                    )?.value;
-                    if (qty && amt) handleApiClose(Number(pos.id), qty, amt);
-                  }}
-                  className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {activeJobId ? "Job running..." : "Execute Closing (API)"}
-                </button>
-              </div>
+              <button
+                disabled={!!activeJobId}
+                onClick={() => handleApiClose(Number(pos.id), "", "")}
+                title="Closes the full Orderly short, settles PnL, withdraws margin, and unwinds the on-chain legs."
+                className="rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {activeJobId ? "Job running..." : "Execute Closing (API)"}
+              </button>
             )}
           </div>
         </div>
@@ -787,7 +1076,7 @@ export default function ManagePage({
                 </span>
                 {jobStatus.txHash && (
                   <a
-                    href={`https://berascan.com/tx/${jobStatus.txHash}`}
+                    href={`${addresses.explorer}/tx/${jobStatus.txHash}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-xs text-cyan-400 underline"
@@ -801,8 +1090,24 @@ export default function ManagePage({
         )}
 
         {apiError && (
-          <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400">
-            API Error: {apiError}
+          <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400 space-y-2">
+            <div className="font-semibold">API Error</div>
+            <div className="text-xs break-all">{apiError}</div>
+            {(apiError.toLowerCase().includes("orderly") || apiError.toLowerCase().includes("delegate") || apiError.toLowerCase().includes("not set up")) && (
+              <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                Hint: this vault may not be initialized on Orderly. Go to the <b>Setup</b> tab and click <b>"Initialize on Orderly"</b>, then retry.
+              </div>
+            )}
+            {apiError.toLowerCase().includes("odos") && (
+              <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                Hint: Odos swap failed. Likely causes: allocation too small (must be at least $0.10), or wrong collateral asset address.
+              </div>
+            )}
+            {apiError.toLowerCase().includes("not in trading") && (
+              <div className="mt-2 rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+                Hint: vault must be in TRADING state. Go to <b>Setup → Trade Cycle</b> and click <b>"Start Trading"</b>.
+              </div>
+            )}
           </div>
         )}
 
@@ -855,13 +1160,13 @@ export default function ManagePage({
             {/* Allocation */}
             <div>
               <label className="mb-1 block text-xs text-slate-400">
-                Allocation (token amount, 18 decimals)
+                Allocation (USDC, e.g. 0.5)
               </label>
               <input
                 type="text"
                 value={allocation}
                 onChange={(e) => setAllocation(e.target.value)}
-                placeholder="e.g. 1000000000000000000"
+                placeholder="e.g. 0.5"
                 className="w-full rounded-lg border border-slate-600 bg-slate-800 px-4 py-2.5 font-mono text-sm text-white focus:border-orange-500 focus:outline-none"
               />
             </div>
@@ -871,7 +1176,7 @@ export default function ManagePage({
           <button
             disabled={isWritePending || !collateralAsset || !perpsAsset || !allocation}
             onClick={() => {
-              const allocationBn = BigInt(allocation);
+              const allocationBn = parseUnits(allocation, 6);
               fireAction("Define Position", {
                 address: addresses.curatorRouter,
                 abi: curatorRouterAbi,

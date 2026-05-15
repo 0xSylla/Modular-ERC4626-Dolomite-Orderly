@@ -109,7 +109,7 @@ export default function BacktestEquityChart({ threshold, execMode, fundingFilter
         <div className="flex items-center gap-2 mb-1 px-1">
           <span className="text-[8px] text-[#818181] uppercase tracking-wider">Equity Curve</span>
         </div>
-        <ResponsiveContainer width="100%" height="100%">
+        <ResponsiveContainer width="100%" height="92%">
           <AreaChart data={curve} margin={{ top: 4, right: 4, bottom: 0, left: 4 }}>
             <defs>
               <linearGradient id="btGrad" x1="0" y1="0" x2="0" y2="1">

@@ -57,8 +57,9 @@ interface CollateralAsset {
 }
 
 const ALL_SWAP_MODULES = [
-  { key: "swap.kodiak", label: "Kodiak", hash: keccak256(encodePacked(["string"], ["swap.kodiak"])) },
-  { key: "swap.odos",   label: "Odos",   hash: keccak256(encodePacked(["string"], ["swap.odos"])) },
+  { key: "swap.kodiak",  label: "Kodiak",     hash: keccak256(encodePacked(["string"], ["swap.kodiak"])) },
+  { key: "swap.uniswap", label: "Uniswap V3", hash: keccak256(encodePacked(["string"], ["swap.uniswap"])) },
+  { key: "swap.odos",    label: "Odos",       hash: keccak256(encodePacked(["string"], ["swap.odos"])) },
 ] as const;
 
 const KNOWN_MODULES_LENDING = [
@@ -153,6 +154,7 @@ export default function DeployV2Page() {
   const [parseError, setParseError]               = useState<string | null>(null);
   const [orderlyInitStatus, setOrderlyInitStatus] = useState<null | "loading" | "success" | "failed">(null);
   const [orderlyInitError, setOrderlyInitError]   = useState<string | null>(null);
+  const [orderlyInitStage, setOrderlyInitStage]   = useState(0);
 
   // Deploy modal
   const [showDeployModal, setShowDeployModal] = useState(false);
@@ -228,7 +230,12 @@ export default function DeployV2Page() {
       const morpho = availableLendingModules.find((m) => m.key === "lending.morpho");
       setSelectedLendingAddr(morpho ? morpho.address : availableLendingModules[0].address);
     }
-    if (!selectedPerpsKey && availablePerpsModules[0]) { setSelectedPerpsKey(availablePerpsModules[0].key); setSelectedPerpsAddr(availablePerpsModules[0].address); }
+    if (!selectedPerpsAddr && availablePerpsModules[0]) {
+      // Match the current key if set, otherwise default to first available
+      const match = availablePerpsModules.find((m) => m.key === selectedPerpsKey) ?? availablePerpsModules[0];
+      setSelectedPerpsKey(match.key);
+      setSelectedPerpsAddr(match.address);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleData]);
 
@@ -258,14 +265,25 @@ export default function DeployV2Page() {
 
   const txQueue = useMemo(() => {
     const q: { label: string; description: string }[] = [
-      { label: "Deploy Vault", description: "Create vault on the factory contract" },
+      {
+        label: "Deploy Vault",
+        description:
+          "Calls createVault on the Dirac factory. This deploys your vault contract on-chain — you'll be the curator and pay one transaction's gas.",
+      },
     ];
     for (const addr of assetArr) {
       const known = COLLATERAL_ASSETS.find((a) => a.address === addr);
       const label = known ? known.label : `${addr.slice(0, 6)}…${addr.slice(-4)}`;
-      q.push({ label: `Whitelist ${label}`, description: `Enable ${label} as collateral` });
+      q.push({
+        label: `Whitelist ${label}`,
+        description: `Authorizes ${label} as a collateral asset the vault can hold. Required before opening any position that uses it.`,
+      });
     }
-    q.push({ label: "Configure Modules", description: "Set swap / lending / perps modules on the vault" });
+    q.push({
+      label: "Configure Modules",
+      description:
+        "Calls setVaultLegs on the curator router to wire up the swap, lending, and perps modules you chose. This is what makes the vault know which protocols to use.",
+    });
     return q;
   }, [assetArr]);
 
@@ -285,7 +303,20 @@ export default function DeployV2Page() {
             vaultName, vaultSymbol, depositToken,
             parseUnits(maxDeposit, 6),
             templateId,
-            { curatorFeeBps: BigInt(curatorFeeBps), curatorFeeRecipient: feeRecipient as `0x${string}` },
+            {
+              performanceFeeBps: BigInt(Math.round((Number(performanceFee) || 0) * 100)),
+              managementFeeBps: BigInt(Math.round((Number(managementFee) || 0) * 100)),
+              feeRecipient: feeRecipient as `0x${string}`,
+            },
+            BigInt(Math.round(rebalanceThreshold * 100)),
+            // fundingRateThresholdBps — stored as |neg threshold| × 10 (0.1 bps precision).
+            // ON:  slider% × 33.445 → pause when 3d MA funding falls below the chosen bps.
+            //      slider=100 → 33 stored → -3.3 bps. slider=0 → 0 stored → -0.0 bps (strictest).
+            // OFF: 1_000_000 stored → pauseThreshold ≈ -10,000% per 8h, unreachable.
+            //      The monitor never pauses. Do NOT use 0 here — that's the strictest setting.
+            fundingFilterOn
+              ? BigInt(Math.round((fundingSlider / 100) * 33.445))
+              : BigInt(1_000_000),
           ],
         });
       } else if (idx <= assetArr.length) {
@@ -298,6 +329,15 @@ export default function DeployV2Page() {
         });
       } else {
         if (!vault || !modulesValid) return;
+        // Resolve module type hashes from selected addresses/keys
+        const swapHash = availableSwapModules.find((m) => m.address === selectedSwapAddr)?.hash;
+        const lendingHash = availableLendingModules.find((m) => m.address === selectedLendingAddr)?.hash;
+        // Perps: always resolve to Orderly hash (frontend allows GMX/etc UI selection but on-chain uses Orderly)
+        const perpsHash = KNOWN_MODULES_PERPS.find((m) => m.key === "perps.orderly")?.hash;
+        if (!swapHash || !lendingHash || !perpsHash) {
+          setParseError("Module type hashes not found");
+          return;
+        }
         writeContract({
           address: addresses.curatorRouter,
           abi: curatorRouterAbi,
@@ -305,9 +345,9 @@ export default function DeployV2Page() {
           args: [
             vault,
             {
-              swapModule:    selectedSwapAddr    as `0x${string}`,
-              lendingModule: selectedLendingAddr as `0x${string}`,
-              perpsModule:   selectedPerpsAddr   as `0x${string}`,
+              swapModuleType:    swapHash,
+              lendingModuleType: lendingHash,
+              perpsModuleType:   perpsHash,
             },
           ],
         });
@@ -320,14 +360,28 @@ export default function DeployV2Page() {
     ],
   );
 
+  /* ---------------------- Orderly init substage timer --------------------- */
+  // The API doesn't stream progress, so advance through stages on a timer
+  // calibrated to the typical ~25s total init time. Stage indexes:
+  //   0 = on-chain delegate signer tx, 1 = confirming with Orderly,
+  //   2 = registering trading key, 3 = setting leverage, 4 = done.
+  useEffect(() => {
+    if (orderlyInitStatus !== "loading") return;
+    const timeline = [5000, 8000, 16000, 22000]; // ms to reach stages 1, 2, 3, "almost done"
+    const timers = timeline.map((delay, i) =>
+      setTimeout(() => setOrderlyInitStage(i + 1 > 3 ? 3 : i + 1), delay),
+    );
+    return () => timers.forEach(clearTimeout);
+  }, [orderlyInitStatus]);
+
   /* ---------------------- handle receipt ---------------------------------- */
   useEffect(() => {
-    if (!receipt || !showDeployModal) return;
+    if (!receipt || deployingTxIdx < 0) return;
 
     let vaultAddr = deployedVault;
 
     if (deployingTxIdx === 0) {
-      const VAULT_CREATED_TOPIC = keccak256(toBytes("VaultCreated(address,address,address)"));
+      const VAULT_CREATED_TOPIC = keccak256(toBytes("VaultCreated(address,address,address,string,string,uint256,uint256,uint256,address,uint256,uint256)"));
       for (const log of receipt.logs) {
         if (log.topics[0]?.toLowerCase() === VAULT_CREATED_TOPIC.toLowerCase() && log.topics[1]) {
           vaultAddr = `0x${log.topics[1].slice(-40)}` as `0x${string}`;
@@ -345,8 +399,10 @@ export default function DeployV2Page() {
       setDeployingTxIdx(nextIdx);
       if (isOrderlyPerps && vaultAddr) {
         setOrderlyInitStatus("loading");
+        setOrderlyInitStage(0);
         initializeVault(chainId, vaultAddr, 2)
           .then(() => {
+            setOrderlyInitStage(4);
             setOrderlyInitStatus("success");
           })
           .catch((err: Error) => {
@@ -392,7 +448,7 @@ export default function DeployV2Page() {
     managementFee.length > 0 &&
     /^0x[a-fA-F0-9]{40}$/.test(feeRecipient);
 
-  const isRiskValid = rebalanceThreshold >= 1 && rebalanceThreshold <= 45;
+  const isRiskValid = rebalanceThreshold >= 1 && rebalanceThreshold <= 35;
 
   const isStep2Valid =
     isConfigValid && isFeesValid && selectedAssets.size > 0 && modulesValid && isRiskValid;
@@ -631,18 +687,18 @@ export default function DeployV2Page() {
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs text-[#818181] uppercase tracking-wider">Rebalancing Threshold</label>
-                    <span className="text-2xl font-bold font-mono" style={{ color: lerpTrackColor((rebalanceThreshold - 1) / 44) }}>{rebalanceThreshold}%</span>
+                    <span className="text-2xl font-bold font-mono" style={{ color: lerpTrackColor((rebalanceThreshold - 1) / 34) }}>{rebalanceThreshold}%</span>
                   </div>
                   <input
                     type="range"
                     min={1}
-                    max={45}
+                    max={35}
                     value={rebalanceThreshold}
                     onChange={(e) => setRebalanceThreshold(Number(e.target.value))}
                     className="rb-slider"
                   />
                   <div className="flex justify-between text-[10px] text-[#818181] mt-1 px-0.5">
-                    <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>45%</span>
+                    <span>1%</span><span>10%</span><span>20%</span><span>30%</span><span>35%</span>
                   </div>
                 </div>
 
@@ -669,14 +725,29 @@ export default function DeployV2Page() {
                     )}
                   </div>
                   {fundingFilterOn && (
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      value={fundingSlider}
-                      onChange={(e) => setFundingSlider(Number(e.target.value))}
-                      className="fr-slider"
-                    />
+                    <>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={fundingSlider}
+                        onChange={(e) => setFundingSlider(Number(e.target.value))}
+                        className="fr-slider"
+                      />
+                      {(() => {
+                        const thresholdBps = Math.round((fundingSlider / 100) * (-33.445)) / 10;
+                        const resumeBps = Math.round((thresholdBps + 0.5) * 10) / 10;
+                        return (
+                          <p className="mt-2 text-[11px] text-[#818181] leading-relaxed">
+                            Pause when 3-day moving average (9 × 8h periods) funding falls below{" "}
+                            <span className="text-white font-mono">{thresholdBps} bps</span>.
+                            Resume when it returns above{" "}
+                            <span className="text-white font-mono">{resumeBps} bps</span>
+                            <span className="text-[#818181]"> (0.5 bps hysteresis to avoid flapping).</span>
+                          </p>
+                        );
+                      })()}
+                    </>
                   )}
                 </div>
 
@@ -865,27 +936,73 @@ export default function DeployV2Page() {
             </div>
           </div>
 
+          {/* What's about to happen */}
+          {deployingTxIdx < 0 && (
+            <div className="rounded-xl border border-[#3C323A] bg-[#171717] p-5 space-y-3">
+              <p className="text-xs text-[#818181] uppercase tracking-wider">Before you click deploy</p>
+              <p className="text-sm text-white">
+                You'll sign <span className="font-semibold">{txQueue.length} transaction{txQueue.length === 1 ? "" : "s"}</span> in your wallet,
+                one after the other:
+              </p>
+              <ol className="space-y-1 pl-1">
+                {txQueue.map((tx, i) => (
+                  <li key={i} className="text-xs text-[#a3a3a3]">
+                    <span className="text-white font-medium">{i + 1}.</span> {tx.label}
+                    <span className="text-[#818181]"> — {tx.description}</span>
+                  </li>
+                ))}
+              </ol>
+              {isOrderlyPerps && (
+                <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 px-3 py-2">
+                  <p className="text-xs text-blue-300">
+                    After your transactions, the Dirac operator will register your vault on Orderly automatically
+                    (1 on-chain tx + 2 off-chain signatures from the operator). You won't be asked to sign anything for this step.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-between pt-2">
             <button onClick={() => setStep("configure")} className="btn-secondary px-6 py-2.5 rounded-lg font-medium">Back</button>
-            <button disabled={!isConnected || isSigning || !modulesValid} onClick={handleStartDeploying}
+            <button disabled={!isConnected || isSigning || !modulesValid || deployingTxIdx >= 0} onClick={handleStartDeploying}
               className="btn-primary px-6 py-2.5 rounded-lg font-medium disabled:opacity-40 disabled:cursor-not-allowed">
-              {!isConnected ? "Connect Wallet" : "Deploy Vault"}
+              {!isConnected ? "Connect Wallet" : deployingTxIdx >= 0 ? "Deploying…" : "Deploy Vault"}
             </button>
           </div>
         </div>
       )}
 
       {/* ========================== INLINE DEPLOY STATUS ===================== */}
-      {(isSigning || isConfirming || deployedVault) && (
-        <div className="mt-4 rounded-lg border border-[#3C323A] bg-[#252525] p-4 space-y-2">
-          {isSigning && <p className="text-sm text-amber-300">Waiting for wallet signature...</p>}
-          {isConfirming && <p className="text-sm text-blue-300">Confirming on-chain...</p>}
-          {writeError && <p className="text-sm text-red-400">{(writeError as Error).message}</p>}
-          {parseError && <p className="text-sm text-red-400">{parseError}</p>}
-          {deployedVault && (
-            <p className="text-sm text-emerald-400">Vault deployed: <span className="font-mono">{deployedVault}</span></p>
-          )}
-        </div>
+      {deployingTxIdx >= 0 && (
+        <DeployProgressPanel
+          txQueue={txQueue}
+          deployingTxIdx={deployingTxIdx}
+          completedTxs={completedTxs}
+          isSigning={isSigning}
+          isConfirming={isConfirming}
+          txHash={txHash}
+          writeError={writeError}
+          parseError={parseError}
+          deployedVault={deployedVault}
+          explorer={addresses.explorer}
+          isOrderlyPerps={isOrderlyPerps}
+          orderlyInitStatus={orderlyInitStatus}
+          orderlyInitStage={orderlyInitStage}
+          orderlyInitError={orderlyInitError}
+          onRetryOrderly={() => {
+            if (!deployedVault) return;
+            setOrderlyInitError(null);
+            setOrderlyInitStatus("loading");
+            setOrderlyInitStage(0);
+            initializeVault(chainId, deployedVault, 2)
+              .then(() => { setOrderlyInitStage(4); setOrderlyInitStatus("success"); })
+              .catch((err: Error) => {
+                setOrderlyInitError(err?.message ?? "Orderly initialization failed");
+                setOrderlyInitStatus("failed");
+              });
+          }}
+        />
       )}
 
       {/* ========================== SUBMIT STRATEGY MODAL ================= */}
@@ -1038,6 +1155,230 @@ function ModuleSelector({
             <option key={opt.key} value={opt.address}>{opt.label}</option>
           ))}
         </select>
+      )}
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------- */
+/*                         Inline deploy progress                          */
+/* ---------------------------------------------------------------------- */
+
+const ORDERLY_STAGE_LABELS = [
+  "Submitting delegate-signer transaction on-chain",
+  "Waiting for Orderly to confirm the registration",
+  "Registering a trading key with Orderly",
+  "Setting initial leverage",
+];
+
+function StepIcon({ state }: { state: "done" | "current" | "pending" | "failed" }) {
+  if (state === "done") {
+    return (
+      <div className="h-7 w-7 rounded-full bg-emerald-500/20 flex items-center justify-center shrink-0">
+        <svg className="h-4 w-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+        </svg>
+      </div>
+    );
+  }
+  if (state === "failed") {
+    return (
+      <div className="h-7 w-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
+        <svg className="h-4 w-4 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </div>
+    );
+  }
+  if (state === "current") {
+    return <div className="h-7 w-7 rounded-full border-2 border-[#FB5F07] border-t-transparent animate-spin shrink-0" />;
+  }
+  return <div className="h-7 w-7 rounded-full bg-[#252525] flex items-center justify-center text-xs font-bold text-[#818181] shrink-0">·</div>;
+}
+
+function DeployProgressPanel({
+  txQueue, deployingTxIdx, completedTxs, isSigning, isConfirming, txHash,
+  writeError, parseError, deployedVault, explorer, isOrderlyPerps,
+  orderlyInitStatus, orderlyInitStage, orderlyInitError, onRetryOrderly,
+}: {
+  txQueue: { label: string; description: string }[];
+  deployingTxIdx: number;
+  completedTxs: Set<number>;
+  isSigning: boolean;
+  isConfirming: boolean;
+  txHash: `0x${string}` | undefined;
+  writeError: Error | null;
+  parseError: string | null;
+  deployedVault: `0x${string}` | null;
+  explorer: string;
+  isOrderlyPerps: boolean;
+  orderlyInitStatus: null | "loading" | "success" | "failed";
+  orderlyInitStage: number;
+  orderlyInitError: string | null;
+  onRetryOrderly: () => void;
+}) {
+  const allTxsDone = completedTxs.size >= txQueue.length;
+  const fullyDone = allTxsDone && (!isOrderlyPerps || orderlyInitStatus === "success");
+
+  return (
+    <div className="mt-6 rounded-xl border border-[#3C323A] bg-[#1a1a1a] p-5 space-y-4">
+      <div className="flex items-baseline justify-between">
+        <h3 className="text-base font-semibold text-white">
+          {fullyDone ? "Deployment complete" : "Deploying your vault"}
+        </h3>
+        <p className="text-xs text-[#818181]">
+          {completedTxs.size} / {txQueue.length} transactions confirmed
+          {isOrderlyPerps && ` · Orderly: ${orderlyInitStatus ?? "pending"}`}
+        </p>
+      </div>
+
+      {/* On-chain transactions */}
+      <div className="space-y-2">
+        {txQueue.map((tx, i) => {
+          const isDone = completedTxs.has(i);
+          const isCurrent = i === deployingTxIdx && !isDone;
+          const state: "done" | "current" | "pending" | "failed" = isDone
+            ? "done"
+            : isCurrent
+              ? "current"
+              : "pending";
+          return (
+            <div
+              key={i}
+              className={`flex items-start gap-3 px-4 py-3 rounded-lg border transition-all ${
+                isDone
+                  ? "border-emerald-500/30 bg-emerald-500/5"
+                  : isCurrent
+                    ? "border-[#FB5F07]/50 bg-[#FB5F07]/5"
+                    : "border-[#3C323A] bg-[#252525]/40 opacity-60"
+              }`}
+            >
+              <StepIcon state={state} />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <p className={`text-sm font-medium ${isDone ? "text-emerald-300" : isCurrent ? "text-white" : "text-[#818181]"}`}>
+                    {i + 1}. {tx.label}
+                  </p>
+                  <span className="text-[10px] text-[#818181] uppercase tracking-wide">Wallet signature</span>
+                </div>
+                <p className="text-xs text-[#a3a3a3] mt-1 leading-snug">{tx.description}</p>
+                {isCurrent && (
+                  <p className="text-xs text-[#FB5F07] mt-1.5">
+                    {isSigning
+                      ? "Open your wallet and approve the transaction…"
+                      : isConfirming
+                        ? "Sent — waiting for on-chain confirmation…"
+                        : "Preparing transaction…"}
+                  </p>
+                )}
+                {isDone && <p className="text-xs text-emerald-400 mt-1">Confirmed on-chain.</p>}
+                {isCurrent && txHash && (
+                  <a href={`${explorer}/tx/${txHash}`} target="_blank" rel="noopener noreferrer"
+                     className="inline-block text-[10px] text-[#818181] underline mt-1">
+                    view pending tx
+                  </a>
+                )}
+              </div>
+            </div>
+          );
+        })}
+
+        {/* Orderly init substep */}
+        {isOrderlyPerps && allTxsDone && (
+          <div
+            className={`flex items-start gap-3 px-4 py-3 rounded-lg border transition-all ${
+              orderlyInitStatus === "success"
+                ? "border-emerald-500/30 bg-emerald-500/5"
+                : orderlyInitStatus === "failed"
+                  ? "border-red-500/40 bg-red-500/10"
+                  : orderlyInitStatus === "loading"
+                    ? "border-[#FB5F07]/50 bg-[#FB5F07]/5"
+                    : "border-[#3C323A] bg-[#252525]/40 opacity-60"
+            }`}
+          >
+            <StepIcon
+              state={
+                orderlyInitStatus === "success" ? "done"
+                : orderlyInitStatus === "failed" ? "failed"
+                : orderlyInitStatus === "loading" ? "current"
+                : "pending"
+              }
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-baseline gap-2 flex-wrap">
+                <p className={`text-sm font-medium ${
+                  orderlyInitStatus === "success" ? "text-emerald-300"
+                  : orderlyInitStatus === "failed" ? "text-red-300"
+                  : orderlyInitStatus === "loading" ? "text-white"
+                  : "text-[#818181]"
+                }`}>
+                  {txQueue.length + 1}. Register vault on Orderly Network
+                </p>
+                <span className="text-[10px] text-blue-300 uppercase tracking-wide">No signature from you</span>
+              </div>
+              <p className="text-xs text-[#a3a3a3] mt-1 leading-snug">
+                The Dirac operator registers your vault on Orderly so it can deposit margin and trade perps. The
+                operator signs the on-chain delegate-signer transaction, two EIP-712 messages (delegate confirmation
+                + trading key), and sets your initial leverage. You don't need to sign anything for this step.
+              </p>
+              {orderlyInitStatus === "loading" && (
+                <div className="mt-2 space-y-1">
+                  {ORDERLY_STAGE_LABELS.map((label, i) => {
+                    const subState: "done" | "current" | "pending" =
+                      i < orderlyInitStage ? "done" : i === orderlyInitStage ? "current" : "pending";
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-xs">
+                        {subState === "done" ? (
+                          <span className="text-emerald-400">✓</span>
+                        ) : subState === "current" ? (
+                          <span className="inline-block h-2 w-2 rounded-full bg-[#FB5F07] animate-pulse" />
+                        ) : (
+                          <span className="inline-block h-2 w-2 rounded-full bg-[#3C323A]" />
+                        )}
+                        <span className={subState === "current" ? "text-white" : subState === "done" ? "text-emerald-400" : "text-[#818181]"}>
+                          {label}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+              {orderlyInitStatus === "success" && (
+                <p className="text-xs text-emerald-400 mt-1">Registered. Vault can now deposit margin and short on Orderly.</p>
+              )}
+              {orderlyInitStatus === "failed" && (
+                <>
+                  <p className="text-xs text-red-400 mt-1 break-all">{orderlyInitError ?? "Initialization failed"}</p>
+                  <button onClick={onRetryOrderly}
+                    className="btn-primary mt-2 px-3 py-1.5 rounded-lg text-xs font-medium">
+                    Retry initialization
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {(writeError || parseError) && (
+        <div className="p-3 rounded-lg bg-red-900/30 border border-red-700/50 text-red-300 text-xs space-y-1">
+          <p className="font-semibold text-red-300">Transaction error</p>
+          <p className="break-all">{writeError?.message?.slice(0, 300) ?? parseError}</p>
+        </div>
+      )}
+
+      {fullyDone && deployedVault && (
+        <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-2">
+          <p className="text-sm font-semibold text-emerald-300">Vault is ready</p>
+          <p className="text-xs text-[#a3a3a3]">
+            Your vault is deployed at <span className="font-mono text-white">{deployedVault}</span>. Open the Manage page to
+            open deposits, define positions, and start the trade cycle.
+          </p>
+          <div className="flex gap-2 pt-1">
+            <Link href={`/manage/${deployedVault}`} className="btn-primary px-4 py-2 rounded-lg text-xs font-medium">Manage Vault</Link>
+            <Link href={`/vault/${deployedVault}`} className="btn-secondary px-4 py-2 rounded-lg text-xs font-medium">View Vault</Link>
+          </div>
+        </div>
       )}
     </div>
   );

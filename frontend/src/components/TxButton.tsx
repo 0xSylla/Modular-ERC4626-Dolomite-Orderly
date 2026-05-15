@@ -1,6 +1,7 @@
 "use client";
 
 import { useWaitForTransactionReceipt } from "wagmi";
+import { useAddresses } from "@/lib/contracts";
 
 interface TxButtonProps {
   label: string;
@@ -21,6 +22,9 @@ export default function TxButton({
   disabled,
   className,
 }: TxButtonProps) {
+  const addresses = useAddresses();
+  const explorerUrl = addresses.explorer;
+  const explorerName = explorerUrl.includes("arbiscan") ? "Arbiscan" : "Berascan";
   const { isLoading: isConfirming, isSuccess } =
     useWaitForTransactionReceipt({ hash });
 
@@ -54,12 +58,12 @@ export default function TxButton({
           Transaction confirmed!
           {hash && (
             <a
-              href={`https://berascan.com/tx/${hash}`}
+              href={`${explorerUrl}/tx/${hash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="ml-2 underline text-emerald-300"
             >
-              View on Berascan
+              View on {explorerName}
             </a>
           )}
         </div>

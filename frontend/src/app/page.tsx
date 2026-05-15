@@ -50,6 +50,7 @@ interface VaultCardData {
 /* -------------------------------------------------------------------------- */
 
 function VaultCard({ data }: { data: VaultCardData }) {
+  const addresses_cfg = useAddresses();
   const {
     address,
     name,
@@ -156,7 +157,7 @@ function VaultCard({ data }: { data: VaultCardData }) {
           Manage
         </Link>
         <a
-          href={`https://berascan.com/address/${address}`}
+          href={`${addresses_cfg.explorer}/address/${address}`}
           target="_blank"
           rel="noopener noreferrer"
           className="rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-white/5"

@@ -25,7 +25,7 @@ export const CHAIN_CONFIGS: Record<number, ChainConfig> = {
     userRouter: (process.env.NEXT_PUBLIC_USER_ROUTER_ADDR_ARB || ZERO) as `0x${string}`,
     USDC: "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
     strategyAssets: [
-      { label: "wstETH", address: "0x5979d7B546E38E9Ab8B0d483b5C0c2C99b27C399" },
+      { label: "wstETH", address: "0x5979D7b546E38E414F7E9822514be443A4800529" },
       { label: "WBTC",   address: "0x2f2a2543B76A4166549F7aaB2e75Bef0aefC5B0f" },
       { label: "WETH",   address: "0x82aF49447D8a07e3bd95BD0d56f35241523fBab1" },
     ],

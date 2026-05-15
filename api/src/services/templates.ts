@@ -63,8 +63,8 @@ const dolomiteAbi = [
   ], outputs: [], stateMutability: "payable" },
 ] as const;
 
-// Morpho (Arbitrum lending)
-const morphoAbi = [
+// Morpho (Arbitrum lending) — exported so the executor's multi-step close helper can reuse it
+export const morphoAbi = [
   { type: "function", name: "supplyCollateral", inputs: [
     { name: "collateralAsset", type: "address" }, { name: "_amount", type: "uint256" },
     { name: "loanToken", type: "address" }, { name: "oracle", type: "address" },
@@ -75,6 +75,16 @@ const morphoAbi = [
     { name: "collateralAsset", type: "address" }, { name: "oracle", type: "address" },
     { name: "irm", type: "address" }, { name: "lltv", type: "uint256" },
   ], outputs: [], stateMutability: "payable" },
+  { type: "function", name: "repayDebt", inputs: [
+    { name: "borrowAsset", type: "address" }, { name: "_amount", type: "uint256" },
+    { name: "collateralAsset", type: "address" }, { name: "oracle", type: "address" },
+    { name: "irm", type: "address" }, { name: "lltv", type: "uint256" },
+  ], outputs: [], stateMutability: "payable" },
+  { type: "function", name: "withdrawCollateral", inputs: [
+    { name: "collateralAsset", type: "address" }, { name: "_amount", type: "uint256" },
+    { name: "loanToken", type: "address" }, { name: "oracle", type: "address" },
+    { name: "irm", type: "address" }, { name: "lltv", type: "uint256" },
+  ], outputs: [], stateMutability: "payable" },
   { type: "function", name: "repayDebtWithCollateral", inputs: [
     { name: "collateralAsset", type: "address" }, { name: "borrowAsset", type: "address" },
     { name: "minAmountOut", type: "uint256" }, { name: "swapData", type: "bytes" },
@@ -82,6 +92,15 @@ const morphoAbi = [
     { name: "lltv", type: "uint256" },
   ], outputs: [], stateMutability: "payable" },
 ] as const;
+
+// Swap module — Uniswap and Odos share the same on-chain signature (just hardcoded different routers)
+export const swapModuleAbi = [{
+  type: "function", name: "swap", inputs: [
+    { name: "tokenIn", type: "address" }, { name: "amountIn", type: "uint256" },
+    { name: "tokenOut", type: "address" }, { name: "minAmountOut", type: "uint256" },
+    { name: "routerCalldata", type: "bytes" },
+  ], outputs: [], stateMutability: "payable",
+}] as const;
 
 // Orderly (perps — same on all chains)
 const orderlyAbi = [
@@ -182,9 +201,12 @@ registerModule(MODULE_TYPES.SWAP_KODIAK, {
 
 // ============ SWAP: Odos (Arbitrum) ============
 
-registerModule(MODULE_TYPES.SWAP_ODOS, {
-  openBuilder(action, ctx) {
-    if (action !== "swapDepositToCollateral") throw new Error(`Odos: unknown open action ${action}`);
+// The Uniswap and Odos modules share the same on-chain swap signature
+// (tokenIn, amountIn, tokenOut, minOut, routerCalldata) — the only difference
+// is which router each module forwards to. So one builder works for both.
+const arbitrumSwapPlugin = {
+  openBuilder(action: string, ctx: OpenContext): `0x${string}` {
+    if (action !== "swapDepositToCollateral") throw new Error(`Swap: unknown open action ${action}`);
     return encodeFunctionData({
       abi: odosSwapAbi, functionName: "swap",
       args: [
@@ -194,10 +216,13 @@ registerModule(MODULE_TYPES.SWAP_ODOS, {
       ],
     });
   },
-  closeBuilder(_action, _ctx) {
-    throw new Error("Odos has no close actions — lending module handles close");
+  closeBuilder(_action: string, _ctx: CloseContext): `0x${string}` {
+    throw new Error("Arbitrum swap modules have no close actions — lending module handles close");
   },
-});
+};
+
+registerModule(MODULE_TYPES.SWAP_ODOS, arbitrumSwapPlugin);
+registerModule(MODULE_TYPES.SWAP_UNISWAP, arbitrumSwapPlugin);
 
 // ============ LENDING: Dolomite (Bera + Arb) ============
 
@@ -245,9 +270,11 @@ registerModule(MODULE_TYPES.LENDING_MORPHO, {
     const { loanToken, oracle, irm, lltv } = decodeMorphoConfig(lc);
     switch (action) {
       case "supplyCollateral":
+        // MorphoModule.supplyCollateral does NOT interpret max as "full balance" (Dolomite does, Morpho doesn't).
+        // Pass swap minAmountOut — guaranteed to be ≤ vault's wstETH balance after the swap step.
         return encodeFunctionData({
           abi: morphoAbi, functionName: "supplyCollateral",
-          args: [ctx.position.collateralAsset, BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"), loanToken, oracle, irm, lltv],
+          args: [ctx.position.collateralAsset, ctx.swapQuote.minAmountOut, loanToken, oracle, irm, lltv],
         });
       case "borrow":
         return encodeFunctionData({

@@ -61,6 +61,35 @@ export async function initializeVault(chainId: number, vault: string, leverage =
   });
 }
 
+interface OrderlyStatusResult {
+  initialized: boolean;
+  accountId: string;
+  chainId: number;
+}
+
+export async function getOrderlyStatus(chainId: number, vault: string) {
+  return apiFetch<OrderlyStatusResult>(
+    `/vaults/orderly-status/${chainId}/${vault}`
+  );
+}
+
+export interface MonitorState {
+  tracked: boolean;
+  chainId?: number;
+  vault?: string;
+  positionId?: string;
+  mode?: "ACTIVE" | "PAUSED-COLD" | "PAUSED-WARM";
+  perpsAsset?: string;
+  entryPrice?: number;
+  algoOrderId?: number;
+  lastEvalMaBps?: number;
+  updatedAt?: number;
+}
+
+export async function getMonitorState(chainId: number, vault: string, positionId: string | number) {
+  return apiFetch<MonitorState>(`/positions/monitor-state/${chainId}/${vault}/${positionId}`);
+}
+
 export async function confirmDelegateSigner(
   chainId: number,
   vault: string,

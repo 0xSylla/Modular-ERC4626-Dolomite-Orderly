@@ -1,7 +1,8 @@
 import { Router, type Request, type Response } from "express";
 import { type Address } from "viem";
-import { setupVaultOrderly, resumeVaultOrderly } from "../services/orderly";
+import { setupVaultOrderly, resumeVaultOrderly, computeAccountId } from "../services/orderly";
 import { initializeDolomite, initializeOrderlyModule } from "../services/blockchain";
+import { config } from "../config";
 
 export const vaultsRouter = Router();
 
@@ -65,6 +66,44 @@ vaultsRouter.post("/initialize", async (req: Request, res: Response) => {
  *
  * Body: { vault: string, txHash: string, leverage?: number }
  */
+/**
+ * GET /vaults/orderly-status/:chainId/:vault
+ * Reports whether the vault has been registered on Orderly Network.
+ * Queries Orderly's public `/v1/get_account` endpoint so the answer
+ * survives API restarts (does not depend on in-memory credentials).
+ *
+ * Returns: { initialized: boolean, accountId: string }
+ */
+vaultsRouter.get(
+  "/orderly-status/:chainId/:vault",
+  async (req: Request, res: Response) => {
+    try {
+      const { chainId, vault } = req.params;
+      const vaultAddr = vault as Address;
+      const accountId = computeAccountId(vaultAddr);
+
+      const url = `${config.orderlyApiUrl}/v1/get_account?address=${vaultAddr}&broker_id=${config.brokerId}`;
+      const r = await fetch(url);
+
+      // Orderly returns {success:true, data:{...account...}} when registered,
+      // and {success:false, message:"account not exists"} (200) otherwise.
+      // Some error states return non-200.
+      let initialized = false;
+      if (r.ok) {
+        const body = (await r.json().catch(() => null)) as
+          | { success?: boolean; data?: { account_id?: string } }
+          | null;
+        initialized = Boolean(body?.success && body?.data?.account_id);
+      }
+
+      res.json({ initialized, accountId, chainId: Number(chainId) });
+    } catch (err: any) {
+      console.error("[GET /vaults/orderly-status]", err);
+      res.status(500).json({ error: err.message });
+    }
+  }
+);
+
 vaultsRouter.post("/confirm-delegate-signer", async (req: Request, res: Response) => {
   try {
     const { chainId, vault, txHash, leverage } = req.body;

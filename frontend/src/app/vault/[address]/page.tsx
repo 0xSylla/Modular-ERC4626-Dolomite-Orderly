@@ -40,7 +40,7 @@ function formatUsdc(value: bigint | undefined): string {
 
 function formatShares(value: bigint | undefined): string {
   if (value === undefined) return "—";
-  return Number(formatUnits(value, 18)).toLocaleString("en-US", {
+  return Number(formatUnits(value, 12)).toLocaleString("en-US", {
     minimumFractionDigits: 4,
     maximumFractionDigits: 4,
   });
@@ -96,6 +96,9 @@ function TxStatus({
   isPending: boolean;
   onConfirmed?: () => void;
 }) {
+  const addresses = useAddresses();
+  const explorerUrl = addresses.explorer;
+  const explorerName = explorerUrl.includes("arbiscan") ? "Arbiscan" : "Berascan";
   const { isLoading: isConfirming, isSuccess } =
     useWaitForTransactionReceipt({ hash });
 
@@ -126,12 +129,12 @@ function TxStatus({
       <div className="text-sm text-emerald-400 bg-emerald-950/30 border border-emerald-800/40 rounded-lg px-3 py-2 mt-2">
         Transaction confirmed!
         <a
-          href={`https://berascan.com/tx/${hash}`}
+          href={`${explorerUrl}/tx/${hash}`}
           target="_blank"
           rel="noopener noreferrer"
           className="ml-2 underline text-emerald-300"
         >
-          View on Berascan
+          View on {explorerName}
         </a>
       </div>
     );
@@ -372,12 +375,13 @@ function WithdrawRedeemSection({
 
   const isEnabled = cycleStatus === 3 && !!userAddress;
 
-  // Parse amount based on tab
+  // Parse amount based on tab.
+  // Share decimals = asset decimals (6 for USDC) + _decimalsOffset() (6) = 12.
   const parsedAmount =
     amount && !isNaN(Number(amount))
       ? tab === "withdraw"
-        ? parseUnits(amount, 6) // assets = USDC 6 decimals
-        : parseUnits(amount, 18) // shares = 18 decimals
+        ? parseUnits(amount, 6)  // assets = USDC 6dp
+        : parseUnits(amount, 12) // shares = 12dp (6 asset + 6 offset)
       : BigInt(0);
 
   // User's vault shares
@@ -491,7 +495,7 @@ function WithdrawRedeemSection({
 
   function handleMax() {
     if (tab === "redeem" && userShares !== undefined) {
-      setAmount(formatUnits(userShares as bigint, 18));
+      setAmount(formatUnits(userShares as bigint, 12));
     }
     // For withdraw-by-assets, max is not straightforward; leave to user
   }
@@ -700,7 +704,7 @@ export default function VaultPage({
     address: vaultAddr,
     abi: vaultAbi,
     functionName: "convertToAssets",
-    args: [parseUnits("1", 18)],
+    args: [parseUnits("1", 12)], // share decimals = asset(6) + offset(6) = 12
     chainId: browsingChainId,
     query: { refetchInterval: 5000 },
   });

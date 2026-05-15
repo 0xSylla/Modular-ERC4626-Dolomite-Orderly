@@ -72,8 +72,9 @@ interface CollateralAsset {
 
 // All known swap modules across chains
 const ALL_SWAP_MODULES = [
-  { key: "swap.kodiak", label: "Kodiak", hash: keccak256(encodePacked(["string"], ["swap.kodiak"])) },
-  { key: "swap.odos",   label: "Odos",   hash: keccak256(encodePacked(["string"], ["swap.odos"])) },
+  { key: "swap.kodiak",  label: "Kodiak",     hash: keccak256(encodePacked(["string"], ["swap.kodiak"])) },
+  { key: "swap.uniswap", label: "Uniswap V3", hash: keccak256(encodePacked(["string"], ["swap.uniswap"])) },
+  { key: "swap.odos",    label: "Odos",       hash: keccak256(encodePacked(["string"], ["swap.odos"])) },
 ] as const;
 
 const KNOWN_MODULES_LENDING = [
@@ -276,7 +277,13 @@ export default function DeployPage() {
             vaultName, vaultSymbol, depositToken,
             parseUnits(maxDeposit, 6),
             templateId,
-            { curatorFeeBps: BigInt(curatorFeeBps), curatorFeeRecipient: feeRecipient as `0x${string}` },
+            {
+              performanceFeeBps: BigInt(curatorFeeBps),
+              managementFeeBps: 0n,
+              feeRecipient: feeRecipient as `0x${string}`,
+            },
+            0n, // rebalanceThresholdBps
+            0n, // fundingRateThresholdBps
           ],
         });
       } else if (idx <= assetArr.length) {
@@ -320,7 +327,7 @@ export default function DeployPage() {
     if (deployingTxIdx === 0) {
       // VaultCreated(address indexed vault, address indexed creator, bytes32 indexed templateId)
       // All params indexed → data is 0x. Match by topic[0] = event signature hash.
-      const VAULT_CREATED_TOPIC = keccak256(toBytes("VaultCreated(address,address,address)"));
+      const VAULT_CREATED_TOPIC = keccak256(toBytes("VaultCreated(address,address,address,string,string,uint256,uint256,uint256,address,uint256,uint256)"));
       for (const log of receipt.logs) {
         if (log.topics[0]?.toLowerCase() === VAULT_CREATED_TOPIC.toLowerCase() && log.topics[1]) {
           // topic[1] is the vault address (padded to 32 bytes) — extract last 20 bytes

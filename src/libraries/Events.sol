@@ -71,6 +71,11 @@ library Events {
     );
     event DepositedToOrderly(uint256 amount);
 
+    // Hyperliquid
+    event HyperliquidOperatorSet(address indexed operator);
+    event HyperliquidDeposited(address indexed operator, uint256 amount);
+    event HyperliquidReturnRecorded(uint256 amount);
+
     // Swap
     event Swapped(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 

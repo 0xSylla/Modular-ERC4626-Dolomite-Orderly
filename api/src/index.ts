@@ -5,8 +5,10 @@ import { positionsRouter } from "./routes/positions";
 import { vaultsRouter } from "./routes/vaults";
 import { monitorRouter } from "./routes/monitor";
 import { stopMonitor } from "./services/rebalance-monitor";
+import { startFundingMonitor, stopFundingMonitor } from "./services/funding-monitor";
 import { operatorAddress } from "./services/blockchain";
 import { cleanupStaleJobs } from "./services/jobs";
+import { bootstrapMonitorState } from "./services/monitor-state";
 
 const app = express();
 
@@ -56,14 +58,27 @@ const cleanupInterval = setInterval(() => {
 }, 10 * 60 * 1000);
 
 // Graceful shutdown
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, async () => {
   console.log(`Dirac API running on port ${config.port}`);
   console.log(`Operator: ${operatorAddress}`);
+  // Hydrate the in-memory monitor cache from Postgres (prod) or the JSON file
+  // (local dev). Must complete before the funding monitor starts ticking,
+  // otherwise the first tick sees an empty position list.
+  try {
+    await bootstrapMonitorState();
+  } catch (err: any) {
+    console.error(`[boot] bootstrapMonitorState failed: ${err.message}`);
+    process.exit(1);
+  }
+  // Funding-rate monitor: long-running background loop that drives pause/resume
+  // and post-TP/SL rebalances for every tracked position.
+  startFundingMonitor();
 });
 
 function shutdown() {
   console.log("Shutting down...");
   stopMonitor();
+  stopFundingMonitor();
   clearInterval(cleanupInterval);
   server.close(() => process.exit(0));
   // Force exit after 10s if connections don't close

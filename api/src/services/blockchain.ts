@@ -30,8 +30,30 @@ const CHAIN_DEFS: Record<number, Chain> = {
   42161: arbitrum,
 };
 
-const publicClients = new Map<number, ReturnType<typeof createPublicClient>>();
-const walletClients = new Map<number, ReturnType<typeof createWalletClient>>();
+// The cache types are derived from the create*-functions below so that the bound
+// account + chain stay encoded in the type. Without this, viem can't tell the
+// account is pre-set and demands `account` on every per-call invocation.
+function createBoundPublicClient(chainId: number) {
+  const cfg = getChainConfig(chainId);
+  return createPublicClient({
+    chain: getChainDef(chainId),
+    transport: http(cfg.rpcUrl),
+  });
+}
+function createBoundWalletClient(chainId: number) {
+  const cfg = getChainConfig(chainId);
+  return createWalletClient({
+    account,
+    chain: getChainDef(chainId),
+    transport: http(cfg.rpcUrl),
+  });
+}
+
+type BoundPublicClient = ReturnType<typeof createBoundPublicClient>;
+type BoundWalletClient = ReturnType<typeof createBoundWalletClient>;
+
+const publicClients = new Map<number, BoundPublicClient>();
+const walletClients = new Map<number, BoundWalletClient>();
 
 function getChainDef(chainId: number): Chain {
   const chain = CHAIN_DEFS[chainId];
@@ -39,28 +61,19 @@ function getChainDef(chainId: number): Chain {
   return chain;
 }
 
-export function getPublicClient(chainId: number) {
+export function getPublicClient(chainId: number): BoundPublicClient {
   let client = publicClients.get(chainId);
   if (!client) {
-    const cfg = getChainConfig(chainId);
-    client = createPublicClient({
-      chain: getChainDef(chainId),
-      transport: http(cfg.rpcUrl),
-    });
+    client = createBoundPublicClient(chainId);
     publicClients.set(chainId, client);
   }
   return client;
 }
 
-export function getWalletClient(chainId: number) {
+export function getWalletClient(chainId: number): BoundWalletClient {
   let client = walletClients.get(chainId);
   if (!client) {
-    const cfg = getChainConfig(chainId);
-    client = createWalletClient({
-      account,
-      chain: getChainDef(chainId),
-      transport: http(cfg.rpcUrl),
-    });
+    client = createBoundWalletClient(chainId);
     walletClients.set(chainId, client);
   }
   return client;
@@ -71,6 +84,7 @@ export function getWalletClient(chainId: number) {
 export const MODULE_TYPES = {
   SWAP_KODIAK: keccak256(toHex("swap.kodiak")),
   SWAP_ODOS: keccak256(toHex("swap.odos")),
+  SWAP_UNISWAP: keccak256(toHex("swap.uniswap")),
   LENDING_DOLOMITE: keccak256(toHex("lending.dolomite")),
   LENDING_AAVE: keccak256(toHex("lending.aave")),
   LENDING_MORPHO: keccak256(toHex("lending.morpho")),
@@ -205,6 +219,47 @@ export async function getStrategyAssetInfo(chainId: number, token: Address) {
   });
 }
 
+/**
+ * Read the live collateral amount the vault has supplied to a Morpho Blue market.
+ * Computes marketId from MarketParams, then queries Morpho.position(id, vault).
+ */
+const MORPHO_BLUE_ARB = "0x6c247b1F6182318877311737BaC0844bAa518F5e" as `0x${string}`;
+const morphoBlueAbi = [{
+  type: "function", name: "position",
+  inputs: [{ name: "id", type: "bytes32" }, { name: "user", type: "address" }],
+  outputs: [
+    { name: "supplyShares", type: "uint256" },
+    { name: "borrowShares", type: "uint128" },
+    { name: "collateral", type: "uint128" },
+  ],
+  stateMutability: "view",
+}] as const;
+
+export async function getMorphoCollateral(
+  chainId: number,
+  vault: Address,
+  marketParams: {
+    loanToken: Address; collateralToken: Address; oracle: Address; irm: Address; lltv: bigint;
+  },
+): Promise<bigint> {
+  const { keccak256, encodeAbiParameters } = await import("viem");
+  const marketId = keccak256(encodeAbiParameters(
+    [{ type: "tuple", components: [
+      { name: "loanToken", type: "address" }, { name: "collateralToken", type: "address" },
+      { name: "oracle", type: "address" }, { name: "irm", type: "address" },
+      { name: "lltv", type: "uint256" },
+    ]}],
+    [marketParams as any]
+  ));
+  const pos = await getPublicClient(chainId).readContract({
+    address: MORPHO_BLUE_ARB,
+    abi: morphoBlueAbi,
+    functionName: "position",
+    args: [marketId, vault],
+  }) as readonly [bigint, bigint, bigint];
+  return BigInt(pos[2]); // collateral
+}
+
 export async function getModuleLendingConfig(chainId: number, moduleTypeHash: `0x${string}`, token: Address): Promise<`0x${string}`> {
   const cfg = getChainConfig(chainId);
   return getPublicClient(chainId).readContract({
@@ -216,6 +271,43 @@ export async function getModuleLendingConfig(chainId: number, moduleTypeHash: `0
 }
 
 // ============ Write Helpers ============
+
+/**
+ * Calls `vault.executeBatch(moduleTypes, datas)` directly, bypassing the curator router's
+ * position-state machine. Used by the funding monitor's pause/resume flows — they need to
+ * run module sequences while the position is in ACTIVE state, which the curator router
+ * doesn't allow (its execute* functions all require specific transition states).
+ *
+ * Operator wallet has OPERATOR_ROLE on the vault, and `executeBatch` only requires
+ * `cycle.status == TRADING` — so this works as long as the vault is in trading mode.
+ */
+const vaultBatchAbi = [{
+  type: "function", name: "executeBatch",
+  inputs: [{ name: "moduleTypes", type: "bytes32[]" }, { name: "datas", type: "bytes[]" }],
+  outputs: [{ name: "results", type: "bytes[]" }],
+  stateMutability: "payable",
+}] as const;
+
+export async function vaultExecuteBatch(
+  chainId: number,
+  vault: Address,
+  modules: Hex[],
+  datas: `0x${string}`[],
+  value = 0n,
+) {
+  const txData = encodeFunctionData({
+    abi: vaultBatchAbi,
+    functionName: "executeBatch",
+    args: [modules, datas],
+  });
+  const hash = await getWalletClient(chainId).sendTransaction({
+    to: vault,
+    data: txData,
+    value,
+  });
+  const receipt = await waitForReceipt(chainId, hash);
+  return { hash, receipt };
+}
 
 export async function executeOpeningRequest(
   chainId: number,

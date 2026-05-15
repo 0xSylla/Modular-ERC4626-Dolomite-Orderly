@@ -292,8 +292,14 @@ export const vaultAbi = [
     name: "getCurrentCycle",
     inputs: [],
     outputs: [
-      { name: "status", type: "uint8" },
-      { name: "assetsAtCycleStart", type: "uint256" },
+      {
+        name: "",
+        type: "tuple",
+        components: [
+          { name: "status", type: "uint8" },
+          { name: "assetsAtCycleStart", type: "uint256" },
+        ],
+      },
     ],
     stateMutability: "view",
   },
