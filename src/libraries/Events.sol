@@ -51,6 +51,7 @@ library Events {
     event PositionClosed(uint256 indexed positionId);
     event PositionRebalancing(uint256 indexed positionId);
     event PositionRebalanced(uint256 indexed positionId);
+    event OperatorAutoRebalanceSet(address indexed vault, bool allowed);
     event ModuleExecuted(address indexed module, bool success);
     event FeesCollected(uint256 performanceFee, uint256 managementFee, uint256 totalFees);
     event MaxDepositUpdated(uint256 newMaxDeposit);
@@ -111,4 +112,5 @@ library Events {
     error TotalFeesExceedCap();
     error OnlyDelegatecall();
     error DebtNotFullyRepaid();
+    error OperatorAutoRebalanceDisabled();
 }
