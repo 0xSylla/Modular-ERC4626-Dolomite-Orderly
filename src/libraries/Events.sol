@@ -113,4 +113,5 @@ library Events {
     error OnlyDelegatecall();
     error DebtNotFullyRepaid();
     error OperatorAutoRebalanceDisabled();
+    error DuplicatePositionPair();
 }
