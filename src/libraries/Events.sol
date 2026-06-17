@@ -97,6 +97,7 @@ library Events {
     error AssetNotWhitelisted();
     error PerpsAssetNotAllowed();
     error PositionNotIdle();
+    error PositionExists();
     error PositionNotOpenRequested();
     error PositionNotOpening();
     error PositionNotActive();
