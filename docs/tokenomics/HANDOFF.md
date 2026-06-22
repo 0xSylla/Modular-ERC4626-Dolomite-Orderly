@@ -8,11 +8,11 @@
 |---|---|---|
 | 1 — `$TDIRAC` ERC20 token | ✅ Done, **tested**, **not deployed** | `src/token/TDIRAC.sol`, `script/DeployTDIRAC.s.sol`, `test/TDIRAC.t.sol`. 11/11 tests pass. |
 | 2 — Soulbound layer (`SoulboundReceiptToken` + `SoulboundReceiptPool`) | ✅ Done, **tested**, **not deployed** | `src/token/SoulboundReceiptToken.sol`, `src/token/SoulboundReceiptPool.sol`, `script/DeploySoulboundLayer.s.sol`, `test/SoulboundLayer.t.sol`. 26/26 tests pass. |
-| 3 — Attribution engine | ⚠️ **In progress, blocked on design decision** | See below. Files exist on disk and are committed but do **not currently compile** (intentional WIP). |
+| 3 — Attribution engine | ✅ **Done, tested, not deployed** (V4 + multisig path). `src/registry/AttributionRegistry.sol`, `src/interfaces/IAttributionRegistry.sol`, `script/DeployAttributionRegistry.s.sol`, `test/AttributionRegistry.t.sol`. 31/31 tests pass. **V5 vault + factory deleted.** | See "Decision resolved" below. |
 | 4 — Buyback + Staking + Governance | Not started | — |
 
-Total contracts shipped + tested: **3** (TDIRAC, SoulboundReceiptToken, SoulboundReceiptPool).
-Total tests passing: **37** (Phase 1 + 2 combined).
+Total contracts shipped + tested: **4** (TDIRAC, SoulboundReceiptToken, SoulboundReceiptPool, AttributionRegistry).
+Total tests passing: **68** (Phase 1: 11, Phase 2: 26, Phase 3: 31).
 
 ## Branch + git state
 
@@ -28,61 +28,65 @@ git checkout tokenomics-v1
 git log --oneline -5     # see the commits
 ```
 
-## 🔴 Open decision — read before continuing
+## ✅ Decision resolved (2026-06-22) — V4 + multisig attestation
 
-**Phase 3's "V5 vault hooks" approach is in question.** The user raised this at the end of the previous session and we didn't resolve it.
+**The "V5 vault hooks" approach was discarded.** Phase 3 ships as a single
+multisig-attested `AttributionRegistry` against the **live V4 vaults** — no new
+vault tier, no new factory, no router redeploy, no user migration. Works with
+`0x333970F3524F04759C5e9833b4Caa82b05617c05` (the test vault) today.
 
-### What I started building (and committed as WIP)
+`DiracVaultV5.sol` and `DiracVaultFactoryV5.sol` were **deleted** (`git rm`),
+which also retires the V5 factory EIP-170 overflow problem entirely.
 
-A new vault tier — `DiracVaultV5` — with attribution hooks built in. This means:
-- New `DiracVaultV5.sol` (V4 + ~50 lines of hook code)
-- New `DiracVaultFactoryV5.sol` (V4 factory + author tracking)
-- Fresh V6 router instance bound to V5 factory
-- Migration: users would have to close their V4 vault + redeploy a V5 vault to benefit
+### What shipped
 
-### Why the user pushed back
+`src/registry/AttributionRegistry.sol` holds the pool's sole `attributor` role
+and exposes 3 attestation functions. It reads only `isVault` + `vaultInfo` from
+the live V4 factory (`IDiracFactory`).
 
-V5 vaults are **only required if you want attribution to be 100% on-chain enforceable**. For a draft/internal phase, that's overkill.
-
-### The cheaper alternative
-
-**V4 + multisig-attested `AttributionRegistry` — no V5 needed.**
-
-Registry adds 3 multisig-callable attestation functions:
-- `attestLpsForCycle(vault, cycleId, address[] lps, uint256[] deposits)` — multisig provides the LP list per cycle
-- `attestCuratorGate(vault)` — multisig confirms TVL × LP count milestone
-- `attestStrategistPerformance(templateId, vault, vaultsCount)` — already off-chain attestation
-
-Registry verifies what it can on-chain (`factory.isVault`, template exists) and trusts the multisig for the rest. The DAO can replace the multisig in Phase 4.
-
-| | V5 (what's WIP) | V4 + multisig attestation |
+| Function | Caller role | On-chain checks |
 |---|---|---|
-| LP attribution | Fully on-chain at every `closeCycle` | Multisig pushes per-cycle list |
-| Curator attribution | Fully on-chain at `deposit` | Multisig pushes confirmation |
-| Strategist attribution | Off-chain attested (same) | Off-chain attested (same) |
-| Trust model | Code is law | Multisig until DAO replaces |
-| Migration burden | New factory, users migrate from V4 → V5 | **None — V4 vaults work today including 0x333970 (your test vault)** |
-| Code surface | ~600 LOC of new vault + factory | ~150 LOC of new registry |
+| `attestLpsForCycle(vault, cycleId, lps[], deposits[])` | `attester` | isVault; length match; per-LP `deposit ≥ minLpDeposit`; per-`(vault,cycleId,lp)` de-dup |
+| `attestCuratorGate(vault, tvl, uniqueLps)` | `attester` | isVault; one-time latch; attested `tvl ≥ minTvlForCurator` AND `uniqueLps ≥ minUniqueLps` |
+| `attestStrategistPerformance(templateId, vault, vaultsUsingTemplate)` | `strategistAttester` | isVault; `vault.templateId` matches; author set; per-`(template,vault)` de-dup; count capped at `maxStrategistVaultsCounted` |
 
-### Compile blocker on the V5 path
+Roles: `admin` (DAO knobs + `setTemplateAuthor` + `burnReceipt` via pool),
+`attester` (LP + curator), `strategistAttester` (performance judgment). All
+three default to the multisig; admin can rotate each. Phase 4 DAO replaces them.
 
-`DiracVaultFactoryV5` is ~1,200 bytes OVER the EIP-170 limit (`24,576`). I tried trimming by removing the legacy `registerTemplate(bytes32)` overload + `setTemplateAuthor` + `updateOperator`, but `updateOperator` is part of the `IDiracVaultFactory` interface — removing it made the contract abstract. **The WIP commit is in this broken state intentionally.**
+### Two design choices made this session
 
-If we decide to keep V5, the fix is either:
-- Update `IDiracVaultFactory` to remove `updateOperator` (breaks V1-V4 factories if anything imports the interface — check first)
-- Or stub `updateOperator` to `revert("removed")` (~50 bytes)
-- Or trim something else (e.g., move a chunk to a helper library)
+1. **LP cycle-hold requirement removed.** LP weight is now purely
+   `deposit × lpWeightPerDeposit / 1e6` at the attested snapshot — no
+   diamond-hands multiplier. Reintroducible later via attester snapshot timing
+   or a DAO knob, no contract change. (User's call.)
+2. **Strategist authorship is wired manually in the registry.** The V4 factory
+   doesn't track template authors, so `templateAuthor[templateId]` lives in the
+   registry, set by admin via `setTemplateAuthor(templateId, author)` — callable
+   any time (before/after attestation) and re-pointable. (User asked for the
+   ability to connect strategy→strategist later.)
 
-If we switch to V4+multisig attestation, **`DiracVaultV5.sol` and `DiracVaultFactoryV5.sol` get deleted**, and the only Phase 3 contract is `AttributionRegistry.sol` (already written, already compiles, just needs minor adjustments to add the multisig-attestation functions).
+### Phase 3 files (final state)
 
-## Files written in Phase 3 WIP
+| File | Status |
+|---|---|
+| `src/registry/AttributionRegistry.sol` | ✅ rewritten for V4 + multisig |
+| `src/interfaces/IAttributionRegistry.sol` | ✅ rewritten to the attestation surface |
+| `script/DeployAttributionRegistry.s.sol` | ✅ new — deploys registry + wires `pool.setAttributor` |
+| `test/AttributionRegistry.t.sol` | ✅ new — 31 tests, all passing |
+| `src/vault/DiracVaultV5.sol` | 🗑️ deleted |
+| `src/factory/DiracVaultFactoryV5.sol` | 🗑️ deleted |
 
-| File | Compiles | Action if V5 path | Action if V4+multisig path |
-|---|---|---|---|
-| `src/interfaces/IAttributionRegistry.sol` | ✅ | Keep, no changes | Keep, no changes (hooks become attestation calls) |
-| `src/registry/AttributionRegistry.sol` | ✅ | Keep — already V5-compatible | Adapt: replace `onCycleClose` (vault-callable) with `attestLpsForCycle` (multisig-callable); same for `onCuratorGateHit` → `attestCuratorGate` |
-| `src/vault/DiracVaultV5.sol` | ✅ | Keep | **Delete** |
-| `src/factory/DiracVaultFactoryV5.sol` | ❌ (1.2k bytes over) | Fix size — either drop `updateOperator` (and update interface) or stub it | **Delete** |
+### Deploy (when ready)
+
+`DeploySoulboundLayer.s.sol` first (TDIRAC must already exist), then:
+```
+ADMIN=<multisig> POOL_ADDR=<pool> FACTORY_ADDR=<live V4 factory> \
+  forge script script/DeployAttributionRegistry.s.sol --rpc-url $RPC --broadcast
+```
+Then multisig: `pool.setAttributor(registry)` (the script auto-wires this if the
+broadcaster is the pool admin), and `registry.setTemplateAuthor(...)` per
+strategist. **Not deployed yet — awaiting go-ahead.**
 
 ## Outside the tokenomics scope — other state from this session
 
@@ -104,19 +108,16 @@ Same Claude session also did unrelated production work that the new session may 
 Continue from the previous session's tokenomics workstream.
 
 Read docs/tokenomics/HANDOFF.md first for full context. We're on the
-`tokenomics-v1` branch in DiracHoneypot. Phases 1+2 are done (TDIRAC +
-Soulbound layer, 37 tests passing). Phase 3 is WIP and blocked on a
-design decision: V5 vault with on-chain hooks vs V4 + multisig-attested
-AttributionRegistry. The user is leaning toward V4 + multisig attestation
-to avoid a new vault deploy + migration. The V5 factory also doesn't
-compile (~1.2k over EIP-170 limit). My WIP Phase 3 files (V5 vault, V5
-factory, AttributionRegistry, interface) are committed but the factory
-is broken.
+`tokenomics-v1` branch in DiracHoneypot. Phases 1-3 are done, tested, not
+deployed (68 tests passing). Phase 3 shipped as the V4 + multisig
+AttributionRegistry (no V5 vault — the V5 files were deleted). Nothing is
+blocked.
 
-Proposed next step: switch to the V4 + multisig attestation path. Delete
-DiracVaultV5.sol and DiracVaultFactoryV5.sol. Adapt AttributionRegistry
-to expose attestation functions for the multisig instead of vault hooks.
-Write tests + design doc. Ask the user to confirm before proceeding.
+Phase 4 is next (not started): BuyBackEngine, StakingContract, and the OZ
+Governor (DiracGovernor) — revenue routing + on-chain governance. The
+Phase 4 DAO governor will replace the registry's `attester` /
+`strategistAttester` multisig roles and the pool's `admin` / `attributor`.
+Ask the user what to tackle first before writing code.
 ```
 
 ## Open questions for the team (from `01-overview.md`)
@@ -126,6 +127,6 @@ Still open, carried forward from Phase 1:
 1. SBT shape — ERC20-like (current default) vs ERC1155 vs ERC721
 2. Burn ratio TDIRAC:SBT at launch (1:1 default, 10:1 alternative)
 3. Revenue token per chain (USDC on Arbitrum; Berachain TBD)
-4. LP diamond-hand bonus weighting (linear in cycle count default)
-5. Strategist backtest attestation mechanism (multisig vote v1, on-chain oracle v2)
+4. LP diamond-hand bonus weighting — **resolved (2026-06-22): cycle-hold gate removed; weight = deposit only.** Reintroducible later.
+5. Strategist backtest attestation mechanism — **resolved (2026-06-22): multisig `strategistAttester` for v1**; on-chain oracle deferred to a later rev
 6. Initial supply allocation breakdown across cohorts

@@ -2,56 +2,67 @@
 pragma solidity ^0.8.28;
 
 import {IAttributionRegistry} from "../interfaces/IAttributionRegistry.sol";
-import {IDiracVaultFactory} from "../interfaces/IDiracVaultFactory.sol";
 import {SoulboundReceiptPool} from "../token/SoulboundReceiptPool.sol";
 import {Data} from "../libraries/Data.sol";
 
-/// @dev Subset of V5 vault surface the registry needs at cycle close.
-interface IV5Vault {
-    function depositors() external view returns (address[] memory);
-    function getUserDeposit(address user) external view returns (uint256);
-    function totalAssets() external view returns (uint256);
-}
-
-/// @dev Subset of V5 factory surface the registry reads from.
-interface IV5Factory {
+/// @dev Subset of the (live V4) factory surface the registry reads from. The
+///      V4 factory exposes `isVault` and `vaultInfo`; it does NOT track
+///      template authorship, so authorship lives in this registry instead
+///      (see `templateAuthor` + `setTemplateAuthor`).
+interface IDiracFactory {
     function vaultInfo(address vault) external view returns (Data.VaultInfo memory);
-    function templateAuthor(bytes32 templateId) external view returns (address);
     function isVault(address vault) external view returns (bool);
 }
 
 /// @title AttributionRegistry
 /// @notice Centralized eligibility + minting brain for the Dirac soulbound
-///         receipt system. V5 vaults call `onCycleClose` and `onCuratorGateHit`;
-///         the multisig (later DAO) calls `attestStrategistPerformance`. For
-///         each qualifying actor the registry calls
-///         `SoulboundReceiptPool.mintReceipt(user, amount)`.
+///         receipt system. Works with the EXISTING V4 vaults — no V5 vault or
+///         new factory required. The multisig (later DAO) attests the facts the
+///         chain can't cheaply prove, and the registry verifies what it can:
 ///
-///         The registry holds the only `attributor` role on the pool — vaults
-///         can't mint receipts directly. This isolates the eligibility logic
-///         and makes it independently governable (Phase 4 DAO can tune
-///         thresholds without redeploying vaults).
+///         | Actor      | Attestation fn               | On-chain checks                         |
+///         |------------|------------------------------|------------------------------------------|
+///         | LP         | `attestLpsForCycle`          | caller is attester; vault is a factory vault; per-LP deposit ≥ floor; per-(vault,cycle,lp) de-dup |
+///         | Curator    | `attestCuratorGate`          | caller is attester; vault is a factory vault; attested tvl/uniqueLps ≥ thresholds; one-time latch per vault |
+///         | Strategist | `attestStrategistPerformance`| caller is strategist attester; vault.templateId matches; author is set; per-(template,vault) de-dup |
 ///
-///         **Attribution rules (boss's 3 examples, all DAO-tunable):**
+///         The registry holds the only `attributor` role on the pool — nobody
+///         mints receipts except through here. This isolates the eligibility
+///         logic and makes it independently governable (Phase 4 DAO can tune
+///         thresholds + swap the attester without redeploying vaults).
 ///
-///         | Actor      | Gate                                          | Weight                           |
-///         |------------|-----------------------------------------------|----------------------------------|
-///         | LP         | deposit ≥ minLpDeposit, held through ≥1 close | deposit × lpWeightPerDeposit / 1e6 |
-///         | Curator    | TVL ≥ minTvlForCurator AND uniqueLPs ≥ N      | curatorBaseSbt                   |
-///         | Strategist | template used ≥1x AND multisig-attested       | strategistBaseSbt × min(vaults, cap) |
+///         **Trust model (Phase 3):** the `attester` / `strategistAttester`
+///         roles are the Dirac multisig. They push per-cycle LP lists, curator
+///         milestone confirmations, and strategist performance attestations.
+///         Misbehavior is governance-correctable (admin can `burnReceipt` via
+///         the pool, rotate the attester, or re-point a template author). In
+///         Phase 4 these roles become the DAO governor and the attestations
+///         can be tightened to on-chain enforcement.
+///
+///         **Strategist authorship is wired manually.** The V4 factory doesn't
+///         record who authored a template, so the admin/multisig connects a
+///         template to its strategist whenever convenient via
+///         `setTemplateAuthor(templateId, author)` — before or after the
+///         performance attestation, and re-pointable if needed.
 contract AttributionRegistry is IAttributionRegistry {
     SoulboundReceiptPool public immutable pool;
-    IV5Factory public immutable factory;
+    IDiracFactory public immutable factory;
 
     address public admin;
-    /// @notice Off-chain attester for Step 4 "strategy in line with backtest."
-    ///         Multisig in Phase 3. Becomes DAO governor in Phase 4. The
-    ///         check itself can be auto-computed on-chain in a later rev
-    ///         (compare realized APY ± tolerance to backtest APY).
+
+    /// @notice Attests factual snapshots: per-cycle LP lists + curator
+    ///         milestone confirmations. Multisig in Phase 3, DAO in Phase 4.
+    address public attester;
+
+    /// @notice Attests the Step 4 "strategy performed in line with backtest"
+    ///         judgment, which can't be computed on-chain in v1. Multisig in
+    ///         Phase 3, DAO in Phase 4. Kept separate from `attester` because
+    ///         it's a judgment, not a snapshot — but the two may be the same
+    ///         address.
     address public strategistAttester;
 
     // ===== DAO-tunable thresholds =====
-    /// @notice Minimum LP deposit to qualify for an SBT mint at cycle close
+    /// @notice Minimum LP deposit to qualify for an SBT mint
     ///         (in deposit-token units — USDC = 6 decimals).
     uint256 public minLpDeposit;
 
@@ -71,24 +82,38 @@ contract AttributionRegistry is IAttributionRegistry {
     ///         beyond `maxStrategistVaultsCounted`.
     uint256 public maxStrategistVaultsCounted;
 
+    // ===== Authorship (set manually by admin) =====
+    /// @notice Author credited for each strategy template. Set + re-pointable
+    ///         by admin via `setTemplateAuthor`. Zero = no strategist
+    ///         attribution possible for that template yet.
+    mapping(bytes32 => address) public templateAuthor;
+
     // ===== Tracking (de-dup) =====
-    /// @notice (vault, cycleId, user) → already attributed for this close
+    /// @notice (vault, cycleId, user) → already attributed for this cycle.
     mapping(address => mapping(uint256 => mapping(address => bool))) public lpAttributedInCycle;
-    /// @notice (templateId, vault) → strategist already paid for this pairing
+    /// @notice vault → curator milestone already paid (one-time latch).
+    mapping(address => bool) public curatorAttributed;
+    /// @notice (templateId, vault) → strategist already paid for this pairing.
     mapping(bytes32 => mapping(address => bool)) public strategistAttested;
 
     // ===== Events =====
     event LpAttributed(address indexed vault, address indexed user, uint256 indexed cycleId, uint256 deposit, uint256 sbtAmount);
     event CuratorAttributed(address indexed vault, address indexed curator, uint256 tvl, uint256 uniqueLps, uint256 sbtAmount);
     event StrategistAttested(bytes32 indexed templateId, address indexed vault, address indexed author, uint256 sbtAmount);
+    event TemplateAuthorSet(bytes32 indexed templateId, address indexed prev, address indexed next);
     event AdminChanged(address indexed prev, address indexed next);
+    event AttesterChanged(address indexed prev, address indexed next);
     event StrategistAttesterChanged(address indexed prev, address indexed next);
     event ParamsChanged(string key, uint256 value);
 
     // ===== Errors =====
     error AR__OnlyAdmin();
+    error AR__OnlyAttester();
     error AR__OnlyStrategistAttester();
     error AR__NotFactoryVault();
+    error AR__LengthMismatch();
+    error AR__CuratorAlreadyAttributed();
+    error AR__CuratorGateNotMet();
     error AR__StrategistAlreadyAttested();
     error AR__TemplateMismatch();
     error AR__NoAuthor();
@@ -99,13 +124,13 @@ contract AttributionRegistry is IAttributionRegistry {
         _;
     }
 
-    modifier onlyStrategistAttester() {
-        if (msg.sender != strategistAttester) revert AR__OnlyStrategistAttester();
+    modifier onlyAttester() {
+        if (msg.sender != attester) revert AR__OnlyAttester();
         _;
     }
 
-    modifier onlyFactoryVault() {
-        if (!factory.isVault(msg.sender)) revert AR__NotFactoryVault();
+    modifier onlyStrategistAttester() {
+        if (msg.sender != strategistAttester) revert AR__OnlyStrategistAttester();
         _;
     }
 
@@ -113,13 +138,17 @@ contract AttributionRegistry is IAttributionRegistry {
         address _pool,
         address _factory,
         address _admin,
+        address _attester,
         address _strategistAttester
     ) {
-        if (_pool == address(0) || _factory == address(0) || _admin == address(0) || _strategistAttester == address(0))
-            revert AR__ZeroAddress();
+        if (
+            _pool == address(0) || _factory == address(0) || _admin == address(0)
+                || _attester == address(0) || _strategistAttester == address(0)
+        ) revert AR__ZeroAddress();
         pool = SoulboundReceiptPool(_pool);
-        factory = IV5Factory(_factory);
+        factory = IDiracFactory(_factory);
         admin = _admin;
+        attester = _attester;
         strategistAttester = _strategistAttester;
 
         // Sensible defaults — DAO will tune. Comments cite the rationale.
@@ -133,53 +162,56 @@ contract AttributionRegistry is IAttributionRegistry {
     }
 
     // ================================================================
-    // Hooks called by V5 vault
+    // Attestations (multisig → DAO)
     // ================================================================
 
     /// @inheritdoc IAttributionRegistry
-    function onCycleClose(uint256 cycleId) external onlyFactoryVault {
-        address vault = msg.sender;
-        address[] memory lps = IV5Vault(vault).depositors();
-        uint256 n = lps.length;
+    function attestLpsForCycle(
+        address vault,
+        uint256 cycleId,
+        address[] calldata lps,
+        uint256[] calldata deposits
+    ) external onlyAttester {
+        if (!factory.isVault(vault)) revert AR__NotFactoryVault();
+        if (lps.length != deposits.length) revert AR__LengthMismatch();
+
         uint256 floor = minLpDeposit;
         uint256 weight = lpWeightPerDeposit;
 
-        for (uint256 i = 0; i < n; i++) {
+        for (uint256 i = 0; i < lps.length; i++) {
             address u = lps[i];
-            if (lpAttributedInCycle[vault][cycleId][u]) continue;
-            uint256 deposit = IV5Vault(vault).getUserDeposit(u);
+            uint256 deposit = deposits[i];
+            if (u == address(0)) continue;
             if (deposit < floor) continue;
+            if (lpAttributedInCycle[vault][cycleId][u]) continue;
 
             lpAttributedInCycle[vault][cycleId][u] = true;
             // SBT amount = deposit × weight / 1e6 (USDC scale).
             uint256 sbtAmount = (deposit * weight) / 1e6;
+            if (sbtAmount == 0) continue;
             pool.mintReceipt(u, sbtAmount);
             emit LpAttributed(vault, u, cycleId, deposit, sbtAmount);
         }
     }
 
     /// @inheritdoc IAttributionRegistry
-    function onCuratorGateHit() external onlyFactoryVault {
-        address vault = msg.sender;
-        Data.VaultInfo memory info = factory.vaultInfo(vault);
-        // Read tvl + lps independently from the vault for the event log + as a
-        // sanity check against vault state at call time.
-        uint256 tvl = IV5Vault(vault).totalAssets();
+    function attestCuratorGate(
+        address vault,
+        uint256 tvl,
+        uint256 uniqueLps
+    ) external onlyAttester {
+        if (!factory.isVault(vault)) revert AR__NotFactoryVault();
+        if (curatorAttributed[vault]) revert AR__CuratorAlreadyAttributed();
+        if (tvl < minTvlForCurator || uniqueLps < minUniqueLps) revert AR__CuratorGateNotMet();
 
+        Data.VaultInfo memory info = factory.vaultInfo(vault);
+
+        curatorAttributed[vault] = true;
         pool.mintReceipt(info.creator, curatorBaseSbt);
-        emit CuratorAttributed(vault, info.creator, tvl, minUniqueLps, curatorBaseSbt);
+        emit CuratorAttributed(vault, info.creator, tvl, uniqueLps, curatorBaseSbt);
     }
 
-    /// @notice Multisig (or DAO) attests that strategy `templateId` deployed
-    ///         in `vault` performed in line with its backtest. Mints SBT to
-    ///         the template author proportional to `min(vaultsUsingTemplate,
-    ///         maxStrategistVaultsCounted)`.
-    /// @dev    Counting "how many vaults use this template" requires factory
-    ///         enumeration. For a v1 draft we accept a `vaultsUsingTemplate`
-    ///         argument passed in by the attester (off-chain count). The
-    ///         attester is trusted to provide truthful values; misbehavior
-    ///         is governance-correctable. A later rev can enforce this
-    ///         on-chain by adding a per-template vault counter to the factory.
+    /// @inheritdoc IAttributionRegistry
     function attestStrategistPerformance(
         bytes32 templateId,
         address vault,
@@ -191,7 +223,7 @@ contract AttributionRegistry is IAttributionRegistry {
         Data.VaultInfo memory info = factory.vaultInfo(vault);
         if (info.templateId != templateId) revert AR__TemplateMismatch();
 
-        address author = factory.templateAuthor(templateId);
+        address author = templateAuthor[templateId];
         if (author == address(0)) revert AR__NoAuthor();
 
         strategistAttested[templateId][vault] = true;
@@ -210,10 +242,25 @@ contract AttributionRegistry is IAttributionRegistry {
     // Admin / DAO knobs
     // ================================================================
 
+    /// @notice Manually connect a strategy template to its strategist. Callable
+    ///         any time (before or after performance attestation) and
+    ///         re-pointable. Zero address disables strategist attribution for
+    ///         the template.
+    function setTemplateAuthor(bytes32 templateId, address author) external onlyAdmin {
+        emit TemplateAuthorSet(templateId, templateAuthor[templateId], author);
+        templateAuthor[templateId] = author;
+    }
+
     function setAdmin(address newAdmin) external onlyAdmin {
         if (newAdmin == address(0)) revert AR__ZeroAddress();
         emit AdminChanged(admin, newAdmin);
         admin = newAdmin;
+    }
+
+    function setAttester(address newAttester) external onlyAdmin {
+        if (newAttester == address(0)) revert AR__ZeroAddress();
+        emit AttesterChanged(attester, newAttester);
+        attester = newAttester;
     }
 
     function setStrategistAttester(address newAttester) external onlyAdmin {

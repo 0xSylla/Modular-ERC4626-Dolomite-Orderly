@@ -17,40 +17,44 @@ Below: a concrete on-chain enforceable version of each, with edge-case rulings a
 
 ### Rule
 
-Mint SBT to an LP when:
-1. Their `userDeposit` was ≥ `MIN_LP_DEPOSIT` USDC at some point in a cycle, AND
-2. They held their position through ≥ `MIN_CYCLES_FOR_LP_SBT` full cycle transitions
-   (i.e., their balance was non-zero across at least one `TRADING → CLOSED` boundary).
+Mint SBT to an LP when their `deposit` for the attested cycle was ≥ `MIN_LP_DEPOSIT` USDC.
 
-**Weight per mint:** `weight = userDeposit_at_cycle_start × cyclesHeld`
+**Weight per mint:** `weight = deposit × LP_WEIGHT_PER_DEPOSIT / 1e6` (USDC scale). Default
+`LP_WEIGHT_PER_DEPOSIT = 1e18` → 1 SBT per 1 USDC of deposit.
 
-> Rationale: "Risqué son argent durant au moins un cycle complet" maps cleanly
-> to "held a balance across at least one TRADING window." A deposit made
-> during DEPOSIT_OPEN and withdrawn before TRADING does NOT qualify — no risk
-> was actually taken.
+> **Cycle-hold requirement removed (2026-06-22 decision).** The earlier rule
+> required holding across a full `TRADING → CLOSED` boundary and weighted by
+> `cyclesHeld`. For the draft phase we attribute purely on deposit size at the
+> attested snapshot. The diamond-hands multiplier can be reintroduced later as
+> a DAO knob without a contract change (the attester simply chooses the
+> snapshot timing).
 
 ### DAO-tunable knobs
 
 | Param | Default | Notes |
 |---|---|---|
-| `MIN_LP_DEPOSIT` | 100 USDC | Dust floor — prevents 1¢ deposit gaming |
-| `MIN_CYCLES_FOR_LP_SBT` | 1 | Boss's wording = 1 full cycle |
-| `LP_WEIGHT_FORMULA` | `deposit × cyclesHeld` | DAO can switch to `deposit × sqrt(cyclesHeld)` to soften long-tail rewards |
+| `minLpDeposit` | 100 USDC | Dust floor — prevents 1¢ deposit gaming |
+| `lpWeightPerDeposit` | 1e18 | 1 SBT per 1 USDC of deposit (at USDC 6dec) |
 
 ### On-chain enforceability
 
-✅ **Fully on-chain.** The vault tracks `userDeposits[receiver]` (V3+ already does this) and emits `CycleStatusChanged` on every transition. The Attribution module subscribes to these signals and increments a per-user counter. SBT mint is automatic in `closeCycle()` for any LP whose `userDeposits[u] > 0` at that boundary.
+⚠️ **Multisig-attested (V4 path).** No vault changes. The multisig (`attester`
+role) reads the per-cycle LP list off-chain and calls
+`attestLpsForCycle(vault, cycleId, lps[], deposits[])`. The registry verifies
+the caller, that `vault` is a factory vault, the per-LP deposit floor, and
+de-dups per `(vault, cycleId, lp)` — then mints. In Phase 4 the DAO can move
+this to on-chain enforcement if desired.
 
 ### Edge cases
 
 | Case | Ruling |
 |---|---|
-| LP deposits during DEPOSIT_OPEN, withdraws before TRADING starts | **No SBT** — never had skin in the game |
-| LP deposits during DEPOSIT_OPEN, balance still > 0 when cycle closes | **SBT, weight = deposit × 1 cycle** |
-| LP holds across 5 cycles without exit | **SBT, weight = avg_deposit × 5 cycles** (cumulative — minted once per cycle close, not as a single big mint at end) |
-| LP partially withdraws mid-cycle | **No new SBT for the withdrawn portion**; the remaining balance continues to accrue if still ≥ `MIN_LP_DEPOSIT` |
-| Two cycles back-to-back, LP holds through both | **2 SBT mints**, one per cycle close |
-| Vault is closed (no new cycles) | LP's last cycle's SBT is the final attribution; no further mints |
+| LP below `minLpDeposit` for the cycle | **No SBT** — silently skipped, not reverted |
+| Same LP attested twice in one cycle | **One mint** — `(vault, cycleId, lp)` de-dup latch |
+| LP attested across cycles 1 and 2 | **2 mints**, one per cycle (different de-dup keys) |
+| Attester supplies zero address / zero-weight entry | **Skipped** — no mint |
+| `lps.length != deposits.length` | **Reverts** `AR__LengthMismatch` |
+| `vault` not from the factory | **Reverts** `AR__NotFactoryVault` |
 
 ---
 
@@ -82,9 +86,20 @@ This is a **one-time mint per vault** — hitting the threshold a second time af
 
 ### On-chain enforceability
 
-⚠️ **Partial.** `totalAssets()` is on-chain. `uniqueDepositorCount` requires the vault (or a helper) to track distinct depositor addresses — V3+ tracks `totalUsers` already, but it increments and decrements naively (every full withdrawal decrements). A more correct implementation tracks **historical unique depositors** in a `mapping(address => bool) hasEverDeposited`. We'll add this to a V5 vault (or implement off-chain with an indexer if we don't want a new vault rev).
+⚠️ **Multisig-attested (V4 path).** `totalAssets()` is on-chain but
+`uniqueDepositorCount` is not (V3+ `totalUsers` decrements on withdrawal, so it
+isn't a historical-unique count). Rather than ship a V5 vault with
+`hasEverDeposited`, the multisig (`attester` role) calls
+`attestCuratorGate(vault, tvl, uniqueLps)`. The registry **re-checks the
+attested `tvl ≥ minTvlForCurator` AND `uniqueLps ≥ minUniqueLps`** against the
+on-chain thresholds (so the attester can't mint for a sub-threshold vault
+without explicitly lying, and both numbers are logged in the event), confirms
+`vault` is a factory vault, enforces the one-time latch, and mints to
+`vaultInfo.creator`.
 
-> **Decision needed:** add `hasEverDeposited` to a V5 vault (clean) or do it off-chain via an indexer (faster to ship, requires trusting the off-chain oracle)? My recommendation: **on-chain in V5**, since the attribution is permanent and should be censorship-resistant.
+> **Decision resolved (2026-06-22):** V4 + multisig attestation, no V5 vault.
+> See `HANDOFF.md`. A future rev can add `hasEverDeposited` on-chain if the DAO
+> wants the curator gate to be trustless.
 
 ### Edge cases
 
@@ -127,7 +142,18 @@ Mint SBT to a Strategist when their `templateId` (the strategy recipe registered
 
 ### On-chain enforceability
 
-⚠️ **Hybrid.** The "template used by N vaults" check is on-chain (factory tracks templates). The "in line with backtest" check is the multisig calling `attestStrategistPerformance(templateId, vaultAddress)`. After attestation, the SBT mint is automatic.
+⚠️ **Multisig-attested (V4 path).** The strategist attester (multisig) calls
+`attestStrategistPerformance(templateId, vault, vaultsUsingTemplate)`. The
+registry verifies `vault` is a factory vault, that `vault.templateId` matches,
+and that a `templateAuthor` is set, then mints `strategistBaseSbt ×
+min(vaultsUsingTemplate, maxStrategistVaultsCounted)` to the author.
+
+> **Authorship is wired manually.** The live V4 factory does NOT record template
+> authors, so authorship lives in the registry: admin/multisig calls
+> `setTemplateAuthor(templateId, strategist)` whenever convenient — before or
+> after the performance attestation, and re-pointable. `vaultsUsingTemplate` is
+> supplied by the attester (trusted, governance-correctable) since the V4
+> factory doesn't enumerate per-template vault counts.
 
 ### Edge cases
 
@@ -147,49 +173,46 @@ Mint SBT to a Strategist when their `templateId` (the strategy recipe registered
 
 | Actor | Gate | Mint timing | Weight formula | DAO knobs |
 |---|---|---|---|---|
-| LP | Deposit ≥ `MIN_LP_DEPOSIT` AND held through ≥ `MIN_CYCLES_FOR_LP_SBT` cycle close(s) | At each cycle close, automatic | `deposit × cyclesHeld` | `MIN_LP_DEPOSIT`, `MIN_CYCLES_FOR_LP_SBT`, formula |
-| Curator | Vault first hits `MIN_TVL` AND `MIN_UNIQUE_LPS` jointly | Once per vault, automatic | `BASE_WEIGHT + tier_bonus` | `MIN_TVL`, `MIN_UNIQUE_LPS`, base, tier bonuses |
-| Strategist | Template used by ≥1 vault AND backtest-attested | After attestation by multisig | `BASE_WEIGHT × numVaults` (capped) | Attester address, base, max-vaults cap, tolerance |
+| LP | `deposit ≥ minLpDeposit` for the attested cycle | When multisig attests the cycle | `deposit × lpWeightPerDeposit / 1e6` | `minLpDeposit`, `lpWeightPerDeposit` |
+| Curator | Vault first hits `minTvlForCurator` AND `minUniqueLps` jointly | Once per vault, when multisig attests | `curatorBaseSbt` | `minTvlForCurator`, `minUniqueLps`, `curatorBaseSbt` |
+| Strategist | Template used by ≥1 vault AND backtest-attested AND author wired | When multisig attests | `strategistBaseSbt × min(numVaults, cap)` | attester, base, `maxStrategistVaultsCounted` |
 
-## Pseudocode for the attribution module (Phase 3)
+## Implementation (Phase 3 — shipped, V4 + multisig path)
+
+`src/registry/AttributionRegistry.sol` (tested in `test/AttributionRegistry.t.sol`,
+31 tests). Multisig-attested — no vault/factory/router changes; works with the
+live V4 vaults including `0x333970…`.
 
 ```solidity
-contract AttributionRegistry {
-    // DAO-tunable params (storage; set via governor)
-    uint256 public minLpDeposit;
-    uint256 public minCyclesForLpSbt;
-    uint256 public minTvlForCuratorSbt;
-    uint256 public minUniqueLps;
-    address public strategistBacktestAttester;
-    uint256 public maxStrategistVaultsCounted;
-    // ... weights, tier bonuses, etc.
+contract AttributionRegistry is IAttributionRegistry {
+    // Roles: admin (DAO knobs), attester (LP+curator), strategistAttester
+    // DAO-tunable: minLpDeposit, lpWeightPerDeposit, minTvlForCurator,
+    //              minUniqueLps, curatorBaseSbt, strategistBaseSbt,
+    //              maxStrategistVaultsCounted
+    // Authorship wired manually: templateAuthor[templateId] via setTemplateAuthor
 
-    // Mints called by hooks in vault / factory / router
-    function onCycleClose(address vault) external onlyFactoryVault {
-        // For every LP with userDeposits[u] >= minLpDeposit at this point,
-        // mint SBT to u with weight = deposit × 1 (this cycle)
-    }
-
-    function onVaultThresholdHit(address vault) external onlyFactoryVault {
-        // Called from vault.deposit() when TVL × uniqueLPs first crosses
-        require(!curatorAttributed[vault], "already attributed");
-        // Mint to vaultInfo.curator (= original creator)
-    }
-
-    function attestStrategistPerformance(bytes32 templateId, address vault) external {
-        require(msg.sender == strategistBacktestAttester, "not attester");
-        // Mint to template author with weight = base × min(vaultsUsingTemplate, maxCap)
-    }
+    function attestLpsForCycle(address vault, uint256 cycleId,
+        address[] calldata lps, uint256[] calldata deposits) external onlyAttester;
+    function attestCuratorGate(address vault, uint256 tvl, uint256 uniqueLps) external onlyAttester;
+    function attestStrategistPerformance(bytes32 templateId, address vault,
+        uint256 vaultsUsingTemplate) external onlyStrategistAttester;
 }
 ```
 
-## Integration touchpoints (Phase 3 deliverables, not in this session)
+The registry holds the pool's sole `attributor` role — nobody mints receipts
+except through here. It reads only `factory.isVault` + `factory.vaultInfo` from
+the live V4 factory.
 
-| Existing contract | Hook needed | Why |
+## What V4 + multisig trades away vs. the (discarded) V5 path
+
+| | V5 hooks (discarded) | V4 + multisig (shipped) |
 |---|---|---|
-| V5 Vault (forked from V4) | `closeCycle()` — call `AttributionRegistry.onCycleClose(address(this))` before returning | LP attribution at cycle boundary |
-| V5 Vault | `deposit()` — after the per-user state update, if `(totalAssets, uniqueLPs)` newly crosses gate, call `AttributionRegistry.onVaultThresholdHit(this)` | Curator attribution at TVL milestone |
-| V5 Vault | Add `mapping(address => bool) hasEverDeposited` and `uint256 uniqueDepositorCount` (incremented only on first deposit, never decremented) | Needed for the curator gate (current `totalUsers` is bidirectional) |
-| V5 Factory | Store `templateAuthor[templateId]` at `registerTemplate(templateId)` so we know who to credit | Strategist attribution |
-| V6 Router (or new) | Emit `StrategyAdopted(templateId, vault)` on `definePosition` | Track template usage for strategist gate |
-| `AttributionRegistry.sol` (new) | All the above hooks land here | Single source of truth for "who gets what SBT" |
+| LP attribution | vault calls registry at `closeCycle` | multisig pushes per-cycle list |
+| Curator attribution | vault calls registry at `deposit` | multisig confirms milestone |
+| Strategist | identical (multisig-attested either way) | identical |
+| Migration | users close V4 → redeploy V5 | none |
+| Trust | code-is-law | multisig until Phase 4 DAO |
+
+The DAO can replace the `attester`/`strategistAttester` (and `burnReceipt`
+gamed mints via the pool) in Phase 4, converging both paths on the same trust
+model. See `HANDOFF.md` for the full decision record.

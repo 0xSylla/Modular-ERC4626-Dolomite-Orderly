@@ -31,10 +31,11 @@
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Step 4 (Phase 3 — boss's main concern)                                 │
-│   Attribution: incentivized actions automatically trigger SBT mint.   │
-│   Three actor types: LP, Curator, Strategist. Rules in [04-attribution-│
-│   rules.md].                                                           │
+│ Step 4 (Phase 3 — boss's main concern) [DONE]                          │
+│   Attribution: multisig attests incentivized actions; the             │
+│   AttributionRegistry verifies + mints SBT. Three actor types: LP,     │
+│   Curator, Strategist. V4 + multisig (no V5 vault). Rules in           │
+│   [04-attribution-rules.md].                                           │
 └────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
@@ -78,7 +79,7 @@
 |---|---|---|---|
 | **1** | ✅ this session | Token + deploy | `TDIRAC.sol` |
 | 2 | TBD | Soulbound layer | `SoulboundReceiptToken.sol`, `SoulboundReceiptPool.sol` |
-| 3 | TBD | Attribution engine (boss's main ask) | `AttributionRegistry.sol`, hooks into V4 factory + V6 router + vault |
+| 3 | ✅ done, tested, not deployed | Attribution engine (boss's main ask) | `AttributionRegistry.sol` (V4 + multisig attestation — no vault/factory/router changes) |
 | 4 | TBD | Revenue + governance | `BuyBackEngine.sol`, `StakingContract.sol`, `DiracGovernor.sol` (OZ Governor) |
 
 ## Phase 1 deliverables (this session)
@@ -110,7 +111,7 @@
 | 1 | Should Phase 2's SoulboundReceiptToken be ERC721 (one NFT per attribution event, with `weight` field) or ERC1155 (multiple "shares" per user) or ERC20-like non-transferable? | **ERC1155 with `weight` per id** — flexible for revenue math, gas-cheap on batch claim |
 | 2 | What's the TDIRAC:SBT mint ratio? Fixed 1:1, or weighted by action value? | **1:1 for v1**; DAO can change |
 | 3 | Where does protocol revenue come from? Vault performance fee? Curator router skim? Both? | Both — defaults: 10% of vault perf fees, 0% of curator skim |
-| 4 | LP attribution: do "diamond hands" (held through multiple cycles) get bonus weight? | **Yes, linear in cycle count** — see [04-attribution-rules.md](04-attribution-rules.md) |
+| 4 | LP attribution: do "diamond hands" (held through multiple cycles) get bonus weight? | **Deferred (2026-06-22).** Cycle-hold gate removed for the draft; LP weight = `deposit × lpWeightPerDeposit`. Reintroducible later via attester snapshot timing / DAO knob — see [04-attribution-rules.md](04-attribution-rules.md) |
 | 5 | Strategist "in line with backtest" — who attests? Off-chain oracle, DAO multisig vote, or auto-computed from realized vs. backtest delta? | **DAO multisig** for v1 (simplest); upgrade to auto-computed later |
 | 6 | Initial supply allocation breakdown across cohorts? | TBD — needs separate doc once boss confirms percentages |
 

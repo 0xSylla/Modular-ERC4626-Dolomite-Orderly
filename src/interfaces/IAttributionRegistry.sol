@@ -2,37 +2,51 @@
 pragma solidity ^0.8.28;
 
 /// @title IAttributionRegistry
-/// @notice Minimal interface that V5 vault + V5 factory use to notify the
-///         AttributionRegistry of events that may qualify a contributor
-///         (LP / Curator / Strategist) for a SoulboundReceipt mint.
+/// @notice Attestation surface of the AttributionRegistry for the V4 +
+///         multisig path. The registry decides eligibility, applies
+///         DAO-tunable thresholds, and calls `SoulboundReceiptPool.mintReceipt`
+///         for qualified actors. Nobody mints receipts except the registry —
+///         the pool's `attributor` role is held by it alone.
 ///
-///         Hooks are intentionally narrow: vaults push events; the registry
-///         decides eligibility, applies DAO-tunable thresholds, and calls
-///         `SoulboundReceiptPool.mintReceipt` for qualified actors. Vaults
-///         do NOT call the pool directly — the registry mediates so that:
-///           1. Eligibility logic is centralized + governable.
-///           2. The pool's `attributor` role is held by the registry alone.
-///           3. Adding new attribution paths in the future (referrals, bug
-///              bounties, etc.) doesn't require new vault deployments.
-///
-///         All hooks must be SAFE TO REVERT — calling vaults wrap them in
-///         try/catch so a malfunctioning registry can't brick `closeCycle`
-///         or `deposit`.
+///         In Phase 3 the attester roles are the Dirac multisig: it pushes the
+///         facts the chain can't cheaply prove (per-cycle LP lists, curator
+///         milestone confirmation, strategist performance judgment), and the
+///         registry verifies what it can on-chain. In Phase 4 these roles
+///         become the DAO governor and the attestations can be tightened to
+///         on-chain enforcement.
 interface IAttributionRegistry {
-    /// @notice Notify registry that a vault's cycle has just transitioned
-    ///         TRADING → CLOSED. Registry iterates the vault's depositor
-    ///         list and mints LP SBT to each who meets `minLpDeposit`.
-    /// @param cycleId Vault-internal counter incremented at each closeCycle.
-    ///                Registry uses (msg.sender, cycleId) as the de-dup key.
-    function onCycleClose(uint256 cycleId) external;
+    /// @notice Attester pushes the LP list for a vault's cycle. The registry
+    ///         mints LP SBT to each entry whose `deposit >= minLpDeposit`,
+    ///         de-duped per `(vault, cycleId, lp)`.
+    /// @param vault    Must be a factory vault (`factory.isVault`).
+    /// @param cycleId  Vault-internal cycle counter; part of the de-dup key.
+    /// @param lps      LP addresses for this cycle.
+    /// @param deposits Per-LP deposit amounts (deposit-token units), index-aligned with `lps`.
+    function attestLpsForCycle(
+        address vault,
+        uint256 cycleId,
+        address[] calldata lps,
+        uint256[] calldata deposits
+    ) external;
 
-    /// @notice Notify registry that a vault has FIRST jointly satisfied
-    ///         `totalAssets >= minTvlForCurator` AND `uniqueDepositorCount >=
-    ///         minUniqueLps`. One-time per vault — the vault is responsible
-    ///         for the `bool curatorAttributed` latch.
-    function onCuratorGateHit() external;
+    /// @notice Attester confirms a vault first jointly satisfied the curator
+    ///         gate (`tvl >= minTvlForCurator` AND `uniqueLps >= minUniqueLps`).
+    ///         One-time per vault. The registry re-checks the attested numbers
+    ///         against the thresholds and mints `curatorBaseSbt` to the vault
+    ///         creator.
+    function attestCuratorGate(address vault, uint256 tvl, uint256 uniqueLps) external;
 
-    // === Read-only — used by V5 vault to know the LP gate ===
+    /// @notice Strategist attester confirms `templateId` deployed in `vault`
+    ///         performed in line with its backtest. Mints SBT to the template
+    ///         author (set via `setTemplateAuthor`) scaled by
+    ///         `min(vaultsUsingTemplate, maxStrategistVaultsCounted)`.
+    function attestStrategistPerformance(
+        bytes32 templateId,
+        address vault,
+        uint256 vaultsUsingTemplate
+    ) external;
+
+    // === Read-only thresholds ===
     function minLpDeposit() external view returns (uint256);
     function minTvlForCurator() external view returns (uint256);
     function minUniqueLps() external view returns (uint256);
