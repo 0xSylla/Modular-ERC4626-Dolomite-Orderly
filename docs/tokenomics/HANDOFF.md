@@ -9,10 +9,24 @@
 | 1 — `$TDIRAC` ERC20 token | ✅ Done, **tested**, **not deployed** | `src/token/TDIRAC.sol`, `script/DeployTDIRAC.s.sol`, `test/TDIRAC.t.sol`. 11/11 tests pass. |
 | 2 — Soulbound layer (`SoulboundReceiptToken` + `SoulboundReceiptPool`) | ✅ Done, **tested**, **not deployed** | `src/token/SoulboundReceiptToken.sol`, `src/token/SoulboundReceiptPool.sol`, `script/DeploySoulboundLayer.s.sol`, `test/SoulboundLayer.t.sol`. 26/26 tests pass. |
 | 3 — Attribution engine | ✅ **Done, tested, not deployed** (V4 + multisig path). `src/registry/AttributionRegistry.sol`, `src/interfaces/IAttributionRegistry.sol`, `script/DeployAttributionRegistry.s.sol`, `test/AttributionRegistry.t.sol`. 31/31 tests pass. **V5 vault + factory deleted.** | See "Decision resolved" below. |
-| 4 — Buyback + Staking + Governance | Not started | — |
+| 4 — Buyback + Staking + Governance | ✅ **Done, tested, not deployed** | `src/governance/DiracGovernor.sol` + `DiracTimelock.sol`, `src/staking/StakingContract.sol`, `src/buyback/BuyBackEngine.sol`. Deploy scripts + tests for each. 38/38 Phase 4 tests pass. |
 
-Total contracts shipped + tested: **4** (TDIRAC, SoulboundReceiptToken, SoulboundReceiptPool, AttributionRegistry).
-Total tests passing: **68** (Phase 1: 11, Phase 2: 26, Phase 3: 31).
+Total contracts shipped + tested: **8** (TDIRAC, SoulboundReceiptToken, SoulboundReceiptPool, AttributionRegistry, DiracGovernor, DiracTimelock, StakingContract, BuyBackEngine).
+Total tests passing: **106** (P1: 11, P2: 26, P3: 31, P4: 38 = Governance 7 + Staking 17 + BuyBack 14).
+
+## Phase 4 — what shipped + decisions (2026-06-23)
+
+All three Phase 4 pieces built in sequence, V4+multisig-compatible, none deployed.
+
+| Contract | Design | Key decisions |
+|---|---|---|
+| `DiracGovernor` + `DiracTimelock` | OZ v5 Governor (Settings + CountingSimple + Votes + QuorumFraction + TimelockControl) over TDIRAC. | **Vote clock = block number** (TDIRAC uses default ERC20Votes clock, and it's frozen Phase 1), so voting delay/period are in BLOCKS. Deploy defaults assume ~12s blocks; tunable by governance. Timelock minDelay is in seconds. Executor open (`address(0)`), proposer/canceller = governor, deployer renounces admin. |
+| `StakingContract` | **Synthetix duration-based** (rewardRate + periodFinish + rewardPerTokenStored). Stake TDIRAC, earn USDC streamed over `rewardsDuration`. | User chose Synthetix over MasterChef accumulator. staking token (TDIRAC) != reward token (USDC), so the reward-balance invariant is exact. `notifyRewardAmount` pulls USDC from the distributor (approve first). |
+| `BuyBackEngine` | **Uniswap V2-style** router (`swapExactTokensForTokens` + path). | User chose V2 over aggregator/V3. **Keeper role** triggers `buyback(amountIn, minOut, deadline)`; bought TDIRAC sent to a **governance-configurable recipient** (pool by default). Path validated USDC->...->TDIRAC. admin can rescue stuck tokens. |
+
+**Revenue split = independent sinks** (user choice): no on-chain splitter. The revenue router calls `pool.distributeRevenue` and `staking.notifyRewardAmount` with whatever split it wants; the buyback feeds the pool's TDIRAC reserve.
+
+**Role handoff to governance (post-deploy, current admin/multisig calls):** `registry.setAdmin(timelock)`, `pool.setAdmin(timelock)`, `staking.setAdmin(timelock)`, `engine.setAdmin(timelock)`. Attester/keeper/distributor roles can stay multisig for speed or move to the timelock. See each deploy script's printed steps.
 
 ## Branch + git state
 
@@ -108,16 +122,21 @@ Same Claude session also did unrelated production work that the new session may 
 Continue from the previous session's tokenomics workstream.
 
 Read docs/tokenomics/HANDOFF.md first for full context. We're on the
-`tokenomics-v1` branch in DiracHoneypot. Phases 1-3 are done, tested, not
-deployed (68 tests passing). Phase 3 shipped as the V4 + multisig
-AttributionRegistry (no V5 vault — the V5 files were deleted). Nothing is
-blocked.
+`tokenomics-v1` branch in DiracHoneypot. Phases 1-4 are ALL done, tested,
+NOT deployed (106 tests passing). Nothing is blocked. The whole 8-step
+tokenomics stack exists as contracts + deploy scripts + tests: TDIRAC,
+Soulbound layer, AttributionRegistry (V4+multisig), DiracGovernor+Timelock,
+StakingContract (Synthetix), BuyBackEngine (V2 router).
 
-Phase 4 is next (not started): BuyBackEngine, StakingContract, and the OZ
-Governor (DiracGovernor) — revenue routing + on-chain governance. The
-Phase 4 DAO governor will replace the registry's `attester` /
-`strategistAttester` multisig roles and the pool's `admin` / `attributor`.
-Ask the user what to tackle first before writing code.
+Remaining work is OPERATIONAL, not new contracts:
+- Deployment (chain order, ADMIN/multisig address, revenue token per chain,
+  DEX router + path, voting-period block counts) — nothing deployed yet.
+- Role handoff wiring to the timelock (see the deploy scripts' printed steps).
+- Possible integrations: where protocol revenue actually gets routed from
+  (vault perf fees / curator router skim) into pool + staking + buyback.
+- Open team questions in 01-overview.md (SBT shape, burn ratio, supply
+  allocation) remain.
+Ask the user which of these to do before writing code.
 ```
 
 ## Open questions for the team (from `01-overview.md`)

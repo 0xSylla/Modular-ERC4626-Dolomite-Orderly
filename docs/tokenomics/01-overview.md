@@ -40,36 +40,41 @@
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Step 5 (Phase 4)                                                       │
-│   Revenue routing: a DAO-tunable % of protocol revenue (vault fees,    │
-│   curator router fees, anything else) flows to the SoulboundReceipt-   │
-│   Pool. Pool distributes pro-rata to SBT holders.                      │
+│ Step 5 (Phase 4) [DONE]                                                │
+│   Revenue routing: INDEPENDENT SINKS. The revenue router (multisig ->  │
+│   governance) sends a chosen split of USDC revenue to the Soulbound-   │
+│   ReceiptPool (distributeRevenue, pro-rata to SBT holders) and to the  │
+│   StakingContract (notifyRewardAmount). Split is a routing policy, not │
+│   hardcoded.                                                           │
 └────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Step 6 (Phase 4)                                                       │
-│   On-chain DAO governance using TDIRAC's ERC20Votes checkpoints:       │
-│     - Whitelist new curators                                           │
-│     - Approve new strategy templates                                   │
-│     - Tune revenue split %                                             │
-│     - Tune attribution thresholds                                      │
+│ Step 6 (Phase 4) [DONE]                                                │
+│   On-chain DAO governance: DiracGovernor (OZ Governor over TDIRAC      │
+│   ERC20Votes) + DiracTimelock. The timelock becomes admin of the       │
+│   registry + pool + staking + buyback, so all tuning (curators,        │
+│   templates, revenue split, thresholds) flows through proposals.       │
+│   NOTE: vote clock = block number (TDIRAC default), so voting periods  │
+│   are in BLOCKS.                                                       │
 └────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Step 7 (Phase 4)                                                       │
-│   BuyBackEngine: drains a portion of protocol revenue, market-buys     │
-│   TDIRAC on the DEX, transfers the bought TDIRAC to SoulboundReceipt-  │
-│   Pool. Creates buy pressure + replenishes the pool's burn reserve.    │
+│ Step 7 (Phase 4) [DONE]                                                │
+│   BuyBackEngine: holds USDC; a keeper buys TDIRAC on a V2-style DEX    │
+│   (swapExactTokensForTokens, keeper-supplied minOut) and forwards it   │
+│   to a governance-set recipient (the SoulboundReceiptPool by default,  │
+│   to replenish the burn reserve + create buy pressure).               │
 └────────────────────────────────────────────────────────────────────────┘
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│ Step 8 (Phase 4)                                                       │
-│   StakingContract: stake TDIRAC to receive a tunable % of revenue.    │
-│   Likely a Synthetix-style rewards distributor. Distinct from SBT     │
-│   distribution (SBT = attribution-based, Staking = capital-locked).   │
+│ Step 8 (Phase 4) [DONE]                                                │
+│   StakingContract: stake TDIRAC to receive USDC revenue, Synthetix     │
+│   duration-based (rewardRate streamed over rewardsDuration). Distinct  │
+│   from SBT distribution (SBT = attribution-based, Staking =            │
+│   capital-locked). Independent revenue sink.                          │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -80,7 +85,7 @@
 | **1** | ✅ this session | Token + deploy | `TDIRAC.sol` |
 | 2 | TBD | Soulbound layer | `SoulboundReceiptToken.sol`, `SoulboundReceiptPool.sol` |
 | 3 | ✅ done, tested, not deployed | Attribution engine (boss's main ask) | `AttributionRegistry.sol` (V4 + multisig attestation — no vault/factory/router changes) |
-| 4 | TBD | Revenue + governance | `BuyBackEngine.sol`, `StakingContract.sol`, `DiracGovernor.sol` (OZ Governor) |
+| 4 | ✅ done, tested, not deployed | Revenue + governance | `DiracGovernor.sol` + `DiracTimelock.sol`, `StakingContract.sol`, `BuyBackEngine.sol` |
 
 ## Phase 1 deliverables (this session)
 
