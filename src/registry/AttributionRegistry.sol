@@ -46,7 +46,10 @@ interface IDiracFactory {
 ///         performance attestation, and re-pointable if needed.
 contract AttributionRegistry is IAttributionRegistry {
     SoulboundReceiptPool public immutable pool;
-    IDiracFactory public immutable factory;
+    /// @notice Factory the registry sanity-checks attestations against
+    ///         (`isVault` / `vaultInfo`). Mutable by admin so it can be
+    ///         repointed (e.g. V1 vs V4 factory) without redeploying.
+    IDiracFactory public factory;
 
     address public admin;
 
@@ -101,6 +104,7 @@ contract AttributionRegistry is IAttributionRegistry {
     event CuratorAttributed(address indexed vault, address indexed curator, uint256 tvl, uint256 uniqueLps, uint256 sbtAmount);
     event StrategistAttested(bytes32 indexed templateId, address indexed vault, address indexed author, uint256 sbtAmount);
     event TemplateAuthorSet(bytes32 indexed templateId, address indexed prev, address indexed next);
+    event FactoryChanged(address indexed prev, address indexed next);
     event AdminChanged(address indexed prev, address indexed next);
     event AttesterChanged(address indexed prev, address indexed next);
     event StrategistAttesterChanged(address indexed prev, address indexed next);
@@ -249,6 +253,14 @@ contract AttributionRegistry is IAttributionRegistry {
     function setTemplateAuthor(bytes32 templateId, address author) external onlyAdmin {
         emit TemplateAuthorSet(templateId, templateAuthor[templateId], author);
         templateAuthor[templateId] = author;
+    }
+
+    /// @notice Repoint the factory the registry validates attestations against
+    ///         (e.g. switch between the V1 and V4 vault factories). Admin-only.
+    function setFactory(address newFactory) external onlyAdmin {
+        if (newFactory == address(0)) revert AR__ZeroAddress();
+        emit FactoryChanged(address(factory), newFactory);
+        factory = IDiracFactory(newFactory);
     }
 
     function setAdmin(address newAdmin) external onlyAdmin {

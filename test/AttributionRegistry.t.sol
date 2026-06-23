@@ -362,6 +362,37 @@ contract AttributionRegistryTest is Test {
         reg.setMinLpDeposit(1);
     }
 
+    function test_setFactory_repoints() public {
+        MockFactory f2 = new MockFactory();
+        address vault2 = address(0xBEEF);
+        f2.setVault(vault2, curator, TEMPLATE);
+
+        vm.prank(admin);
+        reg.setFactory(address(f2));
+        assertEq(address(reg.factory()), address(f2));
+
+        // attestation now validates against the new factory: vault2 works,
+        // the old vault (not in f2) is rejected.
+        address[] memory lps = new address[](1);
+        uint256[] memory deps = new uint256[](1);
+        lps[0] = alice; deps[0] = 500 * USDC;
+        vm.prank(attester);
+        reg.attestLpsForCycle(vault2, 1, lps, deps);
+        assertEq(sbt.balanceOf(alice), 500 * USDC * 1e12);
+
+        vm.prank(attester);
+        vm.expectRevert(AttributionRegistry.AR__NotFactoryVault.selector);
+        reg.attestLpsForCycle(vault, 1, lps, deps);
+    }
+
+    function test_setFactory_onlyAdminAndNonZero() public {
+        vm.expectRevert(AttributionRegistry.AR__OnlyAdmin.selector);
+        reg.setFactory(address(0xBEEF));
+        vm.prank(admin);
+        vm.expectRevert(AttributionRegistry.AR__ZeroAddress.selector);
+        reg.setFactory(address(0));
+    }
+
     function test_adminSetters_onlyAdmin() public {
         vm.expectRevert(AttributionRegistry.AR__OnlyAdmin.selector);
         reg.setMinLpDeposit(1);

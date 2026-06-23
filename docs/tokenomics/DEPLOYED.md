@@ -18,13 +18,13 @@ revenue is a mock `TestUSDC`, buyback uses a mock router). Real chain, real gas.
 | TDIRAC | `0xe378c52f50da2E1B6491CcE0FCFC58f829DA01aE` |
 | SoulboundReceiptToken (SBT) | `0xA24BE63a52C3173fA43C0f4E112fe821A1BA05cE` |
 | SoulboundReceiptPool | `0xd944F0F4bb283d63CfEed114BBAFA580Ec4243ED` |
-| AttributionRegistry | `0x671B83dbe791548853a4fF24E88E18A6c117cc40` |
+| AttributionRegistry | `0x6C4eA9e53C1E69B149a9375E378015AC69fbd175` (bound to **V1** factory `0xb161fac4…`; supersedes `0x671B83…` which was wrongly bound to the V4 factory) |
 | DiracTimelock | `0x1DE82CB54Ae7b4Fdb8a07D742E1cA9D36c30394d` |
 | DiracGovernor | `0x6cB615564b4630C74FcaADC28BAF2aE79E8351f1` |
 | StakingContract | `0x3eacE1F6618b52665399c1F6d3dF63E1d9161385` |
 | MockV2Router | `0xA9CC5e0d400DD668ED8d55B5FCe24e4700eef24A` |
 | BuyBackEngine | `0x53490C0AC75D2E3A65096d5F928b8eD94337A0A6` |
-| V4 factory (registry binds to, pre-existing) | `0xfB1dD48e7b353690938c7c2aBf213e67e4CF8ed2` |
+| V1 factory (registry binds to, pre-existing) | `0xb161fac415c733c05c1308ec437cd7f9a870ec78` |
 
 Deployer / all roles / treasury: `0xdF2F0C8c58Ade470c780c73e2a3c71b5EB787E9B`
 
@@ -47,7 +47,7 @@ USDC=0x91110db0D77ee769f76de78dE1Ae33E059fb8441
 POOL=0xd944F0F4bb283d63CfEed114BBAFA580Ec4243ED
 STAKING=0x3eacE1F6618b52665399c1F6d3dF63E1d9161385
 BUYBACK=0x53490C0AC75D2E3A65096d5F928b8eD94337A0A6
-REG=0x671B83dbe791548853a4fF24E88E18A6c117cc40
+REG=0x6C4eA9e53C1E69B149a9375E378015AC69fbd175
 
 # mint mock revenue to a wallet
 cast send $USDC "mint(address,uint256)" <WALLET> 1000000000 --rpc-url $R --private-key <PK>
